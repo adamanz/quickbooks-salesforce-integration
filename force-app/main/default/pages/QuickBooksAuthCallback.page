@@ -1,0 +1,148 @@
+<apex:page controller="QuickBooksOAuthController" showHeader="false" sidebar="false" standardStylesheets="false">
+    <html>
+        <head>
+            <title>QuickBooks Authorization</title>
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+                    margin: 0;
+                    padding: 0;
+                    background: #f5f5f5;
+                }
+                .container {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100vh;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                }
+                .card {
+                    background: white;
+                    padding: 40px;
+                    border-radius: 8px;
+                    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+                    text-align: center;
+                    max-width: 400px;
+                }
+                .spinner {
+                    border: 4px solid #f3f3f3;
+                    border-top: 4px solid #667eea;
+                    border-radius: 50%;
+                    width: 40px;
+                    height: 40px;
+                    animation: spin 1s linear infinite;
+                    margin: 20px auto;
+                }
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+                h1 {
+                    color: #333;
+                    margin-top: 0;
+                    font-size: 24px;
+                }
+                p {
+                    color: #666;
+                    font-size: 14px;
+                    line-height: 1.6;
+                }
+                .success {
+                    background: #efe;
+                    color: #3c3;
+                    padding: 15px;
+                    border-radius: 4px;
+                    margin: 20px 0;
+                }
+                .error {
+                    background: #fee;
+                    color: #c33;
+                    padding: 15px;
+                    border-radius: 4px;
+                    margin: 20px 0;
+                }
+                .checkmark {
+                    font-size: 48px;
+                    color: #3c3;
+                }
+                .info-box {
+                    background: #f0f0f0;
+                    padding: 15px;
+                    border-radius: 4px;
+                    margin: 20px 0;
+                    font-size: 13px;
+                    color: #666;
+                }
+                button {
+                    padding: 10px 20px;
+                    background: #667eea;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 14px;
+                }
+                button:hover {
+                    background: #5568d3;
+                }
+                a {
+                    text-decoration: none;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="card">
+                    <!-- Processing State -->
+                    <apex:outputPanel rendered="{!isProcessing}">
+                        <h1>Processing Authorization</h1>
+                        <div class="spinner"></div>
+                        <p>Please wait while we complete your authorization...</p>
+                    </apex:outputPanel>
+
+                    <!-- Success State -->
+                    <apex:outputPanel rendered="{!isSuccess}">
+                        <div class="checkmark">✓</div>
+                        <h1>Authorization Successful!</h1>
+                        <div class="success">
+                            <strong>Your QuickBooks account has been connected to Salesforce.</strong>
+                        </div>
+                        <div class="info-box">
+                            <p>Tokens have been saved and you can now create estimates and sync data with QuickBooks.</p>
+                            <p>You will be redirected to the home page in a few seconds, or you can click the button below.</p>
+                        </div>
+                        <p>
+                            <apex:outputLink value="/"><button>Return to Salesforce</button></apex:outputLink>
+                        </p>
+                    </apex:outputPanel>
+
+                    <!-- Error State -->
+                    <apex:outputPanel rendered="{!isError}">
+                        <h1>Authorization Failed</h1>
+                        <div class="error">
+                            <strong>Error:</strong><br/>
+                            {!errorMessage}
+                        </div>
+                        <div class="info-box">
+                            <p>Please try again or contact support if the problem persists.</p>
+                        </div>
+                        <p>
+                            <apex:outputLink value="/apex/QuickBooksAuthStart"><button>Try Again</button></apex:outputLink>
+                            &nbsp;&nbsp;
+                            <apex:outputLink value="/"><button style="background: #999;">Return to Home</button></apex:outputLink>
+                        </p>
+                    </apex:outputPanel>
+
+                    <script>
+                        // Auto-redirect on success after 3 seconds
+                        if (document.body.innerHTML.includes('Authorization Successful')) {
+                            setTimeout(function() {
+                                window.location.href = '/';
+                            }, 3000);
+                        }
+                    </script>
+                </div>
+            </div>
+        </body>
+    </html>
+</apex:page>

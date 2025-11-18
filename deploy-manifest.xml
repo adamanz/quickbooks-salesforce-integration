@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>QuickBooksAuthProvider</members>
+        <members>QuickBooksAuthStartController</members>
+        <name>ApexClass</name>
+    </types>
+    <types>
+        <members>QuickBooksAuthStart</members>
+        <members>QuickBooksAuthCallback</members>
+        <name>ApexPage</name>
+    </types>
+    <version>60.0</version>
+</Package>

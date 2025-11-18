@@ -1,0 +1,19 @@
+{
+    "packageDirectories": [
+        {
+            "path": "force-app",
+            "default": true,
+            "package": "QuickBooksIntegration",
+            "versionName": "Version 1.0",
+            "versionNumber": "1.0.0.NEXT",
+            "versionDescription": "QuickBooks Online integration with Salesforce using OAuth 2.0 and invocable Flow actions"
+        }
+    ],
+    "name": "QuickBooks-Salesforce Integration",
+    "namespace": "",
+    "sfdcLoginUrl": "https://login.salesforce.com",
+    "sourceApiVersion": "59.0",
+    "packageAliases": {
+        "QuickBooksIntegration": "0Ho000000000000"
+    }
+}

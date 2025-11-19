@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <actionCalls>
+        <name>Send_Message_In_Loop</name>
+        <label>Send Message In Loop</label>
+        <locationX>264</locationX>
+        <locationY>458</locationY>
+        <actionName>sendblue__SendMessage</actionName>
+        <actionType>apex</actionType>
+        <connector>
+            <targetReference>Loop_Through_Contacts</targetReference>
+        </connector>
+        <flowTransactionModel>NewTransaction</flowTransactionModel>
+        <inputParameters>
+            <name>receipientNumber</name>
+            <value>
+                <elementReference>Loop_Through_Contacts.Phone</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>message</name>
+            <value>
+                <elementReference>MessageTemplate</elementReference>
+            </value>
+        </inputParameters>
+        <nameSegment>sendblue__SendMessage</nameSegment>
+    </actionCalls>
+    <apiVersion>63.0</apiVersion>
+    <description>Demonstrates how to send messages in a loop WITHOUT getting &quot;uncommitted work pending&quot; errors by using NewTransaction flow transaction model</description>
+    <environments>Default</environments>
+    <interviewLabel>Sendblue Loop Messages Demo {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Sendblue Loop Messages Demo</label>
+    <loops>
+        <name>Loop_Through_Contacts</name>
+        <label>Loop Through Contacts</label>
+        <locationX>176</locationX>
+        <locationY>350</locationY>
+        <collectionReference>ContactsToMessage</collectionReference>
+        <iterationOrder>Asc</iterationOrder>
+        <nextValueConnector>
+            <targetReference>Send_Message_In_Loop</targetReference>
+        </nextValueConnector>
+        <noMoreValuesConnector>
+            <targetReference>Success_Screen</targetReference>
+        </noMoreValuesConnector>
+    </loops>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>OriginBuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>Flow</processType>
+    <recordLookups>
+        <name>Get_Test_Contacts</name>
+        <label>Get Test Contacts</label>
+        <locationX>176</locationX>
+        <locationY>242</locationY>
+        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Loop_Through_Contacts</targetReference>
+        </connector>
+        <getFirstRecordOnly>false</getFirstRecordOnly>
+        <object>Contact</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
+    <screens>
+        <name>Introduction_Screen</name>
+        <label>Loop Messaging Demo</label>
+        <locationX>176</locationX>
+        <locationY>134</locationY>
+        <allowBack>false</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>false</allowPause>
+        <connector>
+            <targetReference>Get_Test_Contacts</targetReference>
+        </connector>
+        <fields>
+            <name>IntroText</name>
+            <fieldText>&lt;p&gt;&lt;b style=&quot;font-size: 18px;&quot;&gt;Sendblue Loop Messaging Demo&lt;/b&gt;&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;This flow demonstrates how to send messages in a &lt;b&gt;LOOP&lt;/b&gt; without getting &quot;uncommitted work pending&quot; errors.&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;&lt;b&gt;The Secret:&lt;/b&gt; This flow uses &lt;code&gt;flowTransactionModel=NewTransaction&lt;/code&gt;&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;This allows each loop iteration to:&lt;/p&gt;&lt;ol&gt;&lt;li&gt;Make the API callout (SendMessage)&lt;/li&gt;&lt;li&gt;Commit any DML operations&lt;/li&gt;&lt;li&gt;Start fresh for the next iteration&lt;/li&gt;&lt;/ol&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;&lt;b&gt;Note:&lt;/b&gt; This flow will look for Contacts where Test_Contact__c = true&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;Click Next to begin...&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <fields>
+            <name>MessageTemplate</name>
+            <dataType>String</dataType>
+            <defaultValue>
+                <stringValue>Hello {!Loop_Through_Contacts.FirstName}! This is a test message sent via loop.</stringValue>
+            </defaultValue>
+            <fieldText>Message Template</fieldText>
+            <fieldType>InputField</fieldType>
+            <inputsOnNextNavToAssocScrn>UseStoredValues</inputsOnNextNavToAssocScrn>
+            <isRequired>true</isRequired>
+        </fields>
+        <showFooter>true</showFooter>
+        <showHeader>true</showHeader>
+    </screens>
+    <screens>
+        <name>Success_Screen</name>
+        <label>Messages Sent Successfully</label>
+        <locationX>176</locationX>
+        <locationY>650</locationY>
+        <allowBack>false</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>false</allowPause>
+        <fields>
+            <name>SuccessText</name>
+            <fieldText>&lt;p&gt;&lt;span style=&quot;color: rgb(27, 95, 51); font-size: 18px;&quot;&gt;&lt;b&gt;Success!&lt;/b&gt;&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;Messages were sent to all test contacts in the loop.&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;&lt;b&gt;How it worked:&lt;/b&gt;&lt;/p&gt;&lt;ol&gt;&lt;li&gt;Each loop iteration ran in a &lt;b&gt;new transaction&lt;/b&gt;&lt;/li&gt;&lt;li&gt;The SendMessage action made its callout&lt;/li&gt;&lt;li&gt;Any DML was committed before the next iteration&lt;/li&gt;&lt;li&gt;No &quot;uncommitted work pending&quot; errors occurred!&lt;/li&gt;&lt;/ol&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;&lt;b&gt;Remember:&lt;/b&gt; The key is setting &lt;code&gt;flowTransactionModel=NewTransaction&lt;/code&gt; in the flow metadata.&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <showFooter>true</showFooter>
+        <showHeader>true</showHeader>
+    </screens>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Introduction_Screen</targetReference>
+        </connector>
+    </start>
+    <status>Draft</status>
+    <variables>
+        <name>ContactsToMessage</name>
+        <dataType>SObject</dataType>
+        <isCollection>true</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+        <objectType>Contact</objectType>
+    </variables>
+</Flow>

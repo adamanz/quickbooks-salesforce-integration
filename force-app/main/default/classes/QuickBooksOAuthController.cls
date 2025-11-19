@@ -1,4 +1,9 @@
-public with sharing class QuickBooksOAuthController {
+/**
+ * Controller for QuickBooksAuthCallback page
+ * Handles OAuth callback and token exchange
+ * Note: Uses without sharing to allow Site Guest User access for OAuth callback
+ */
+public without sharing class QuickBooksOAuthController {
     public Boolean isProcessing { get; private set; }
     public Boolean isSuccess { get; private set; }
     public Boolean isError { get; private set; }
@@ -54,52 +59,8 @@ public with sharing class QuickBooksOAuthController {
     }
 
     private void exchangeCodeForTokens(String code, String realmId) {
-        // Get QuickBooks configuration
-        QuickBooks_Config__mdt config = getQuickBooksConfig();
-
-        if (config == null) {
-            throw new OAuthException('QuickBooks configuration not found. Please configure QuickBooks settings.');
-        }
-
-        // Prepare token exchange request
-        HttpRequest req = new HttpRequest();
-        req.setEndpoint(TOKEN_ENDPOINT);
-        req.setMethod('POST');
-        req.setHeader('Accept', 'application/json');
-        req.setHeader('Content-Type', 'application/x-www-form-urlencoded');
-
-        // Basic authentication with client ID and secret
-        String credentials = config.Client_Id__c + ':' + config.Client_Secret__c;
-        Blob credentialsBlob = Blob.valueOf(credentials);
-        String encodedCredentials = EncodingUtil.base64Encode(credentialsBlob);
-        req.setHeader('Authorization', 'Basic ' + encodedCredentials);
-
-        // Build request body
-        String redirectUri = config.Redirect_URI__c;
-        if (String.isBlank(redirectUri)) {
-            // Build redirect URI dynamically
-            redirectUri = URL.getOrgDomainUrl().toExternalForm() + '/apex/qboOAuthRedirect';
-        }
-
-        String body = 'grant_type=authorization_code' +
-                     '&code=' + EncodingUtil.urlEncode(code, 'UTF-8') +
-                     '&redirect_uri=' + EncodingUtil.urlEncode(redirectUri, 'UTF-8');
-
-        req.setBody(body);
-
-        // Send request
-        Http http = new Http();
-        HttpResponse res = http.send(req);
-
-        if (res.getStatusCode() != 200) {
-            throw new OAuthException('Token exchange failed: ' + res.getBody());
-        }
-
-        // Parse response
-        Map<String, Object> tokenResponse = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
-
-        // Save tokens
-        saveTokens(tokenResponse, realmId);
+        // Enqueue token exchange as async job to run in system context
+        System.enqueueJob(new TokenExchangeQueueable(code, realmId));
     }
 
     private void saveTokens(Map<String, Object> tokenResponse, String realmId) {
@@ -168,6 +129,61 @@ public with sharing class QuickBooksOAuthController {
         log.Timestamp__c = DateTime.now();
 
         insert log;
+    }
+
+    /**
+     * Queueable job to exchange OAuth code for tokens in system context
+     */
+    public class TokenExchangeQueueable implements Queueable, Database.AllowsCallouts {
+        private String code;
+        private String realmId;
+
+        public TokenExchangeQueueable(String code, String realmId) {
+            this.code = code;
+            this.realmId = realmId;
+        }
+
+        public void execute(QueueableContext context) {
+            try {
+                // Delegate to QuickBooksAuthProvider for token exchange
+                Boolean success = QuickBooksAuthProvider.handleCallback(code, realmId);
+
+                if (success) {
+                    logSuccessQueueable('OAuth tokens saved successfully for Company ID: ' + realmId);
+                } else {
+                    logErrorQueueable('Token Exchange Error', 'handleCallback returned false');
+                }
+
+            } catch (Exception e) {
+                logErrorQueueable('Token Exchange Error', e.getMessage());
+            }
+        }
+
+        private void logErrorQueueable(String context, String errorMessage) {
+            try {
+                Integration_Log__c log = new Integration_Log__c();
+                log.Integration_Type__c = 'QuickBooks OAuth';
+                log.Context__c = context;
+                log.Error_Message__c = errorMessage;
+                log.Timestamp__c = DateTime.now();
+                insert log;
+            } catch (Exception e) {
+                System.debug('Failed to log error: ' + e.getMessage());
+            }
+        }
+
+        private void logSuccessQueueable(String message) {
+            try {
+                Integration_Log__c log = new Integration_Log__c();
+                log.Integration_Type__c = 'QuickBooks OAuth';
+                log.Context__c = 'OAuth Success';
+                log.Error_Message__c = message;
+                log.Timestamp__c = DateTime.now();
+                insert log;
+            } catch (Exception e) {
+                System.debug('Failed to log success: ' + e.getMessage());
+            }
+        }
     }
 
     public class OAuthException extends Exception {}

@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>59.0</apiVersion>
+    <description>Demo flow to test QuickBooks integration with hardcoded values</description>
+    <interviewLabel>QuickBooks Demo Flow</interviewLabel>
+    <label>QuickBooks Demo Flow</label>
+    <processType>Flow</processType>
+    <status>Active</status>
+
+    <!-- Start -->
+    <start>
+        <locationX>50</locationX>
+        <locationY>50</locationY>
+        <connector>
+            <targetReference>Get_Opportunity</targetReference>
+        </connector>
+    </start>
+
+    <!-- Get Opportunity -->
+    <recordLookups>
+        <name>Get_Opportunity</name>
+        <label>Get Opportunity</label>
+        <locationX>176</locationX>
+        <locationY>158</locationY>
+        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Get_Account</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Id</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>recordId</elementReference>
+            </value>
+        </filters>
+        <getFirstRecordOnly>true</getFirstRecordOnly>
+        <object>Opportunity</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
+
+    <!-- Get Account -->
+    <recordLookups>
+        <name>Get_Account</name>
+        <label>Get Account</label>
+        <locationX>176</locationX>
+        <locationY>278</locationY>
+        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Create_QB_Customer</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Id</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>Get_Opportunity.AccountId</elementReference>
+            </value>
+        </filters>
+        <getFirstRecordOnly>true</getFirstRecordOnly>
+        <object>Account</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
+
+    <!-- Create QuickBooks Customer -->
+    <actionCalls>
+        <name>Create_QB_Customer</name>
+        <label>Create QuickBooks Customer</label>
+        <locationX>176</locationX>
+        <locationY>398</locationY>
+        <actionName>QuickBooksCustomerInvocable</actionName>
+        <actionType>apex</actionType>
+        <connector>
+            <targetReference>Customer_Success_Screen</targetReference>
+        </connector>
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <inputParameters>
+            <name>accountId</name>
+            <value>
+                <elementReference>Get_Account.Id</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>companyId</name>
+            <value>
+                <stringValue>HARDCODED_COMPANY_123</stringValue>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>displayName</name>
+            <value>
+                <elementReference>Get_Account.Name</elementReference>
+            </value>
+        </inputParameters>
+        <outputParameters>
+            <assignToReference>customerResponse</assignToReference>
+            <name>output</name>
+        </outputParameters>
+    </actionCalls>
+
+    <!-- Success Screen -->
+    <screens>
+        <name>Customer_Success_Screen</name>
+        <label>QuickBooks Integration Results</label>
+        <locationX>176</locationX>
+        <locationY>518</locationY>
+        <allowBack>true</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>false</allowPause>
+        <fields>
+            <name>Success_Message</name>
+            <fieldText>&lt;p&gt;&lt;b&gt;QuickBooks Customer Creation Results:&lt;/b&gt;&lt;/p&gt;
+&lt;p&gt;Account: {!Get_Account.Name}&lt;/p&gt;
+&lt;p&gt;Customer ID: {!customerResponse.quickBooksCustomerId}&lt;/p&gt;
+&lt;p&gt;Success: {!customerResponse.success}&lt;/p&gt;
+&lt;p&gt;Message: {!customerResponse.message}&lt;/p&gt;
+&lt;p&gt;&lt;br&gt;&lt;/p&gt;
+&lt;p&gt;Based on Estimate #0000006:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Main Product: OxyPro Ultra 6500 - $78,900&lt;/li&gt;
+&lt;li&gt;Power Chair Upgrade - $3,598&lt;/li&gt;
+&lt;li&gt;Starry Roof Liner - $2,400&lt;/li&gt;
+&lt;li&gt;LED Ambient Lighting - $1,100&lt;/li&gt;
+&lt;li&gt;TV Upgrade - $1,799&lt;/li&gt;
+&lt;li&gt;White Glove Delivery - $3,450&lt;/li&gt;
+&lt;li&gt;On Site Installation - $1,200&lt;/li&gt;
+&lt;li&gt;HBOT Training - $950&lt;/li&gt;
+&lt;li&gt;OxyCare+ Support - $595&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Subtotal: $93,992&lt;/p&gt;
+&lt;p&gt;Discount: -$15,092&lt;/p&gt;
+&lt;p&gt;&lt;b&gt;Total: $78,900&lt;/b&gt;&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <showFooter>true</showFooter>
+        <showHeader>true</showHeader>
+    </screens>
+
+    <!-- Variables -->
+    <variables>
+        <name>recordId</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <name>customerResponse</name>
+        <apexClass>QuickBooksCustomerResponse</apexClass>
+        <dataType>Apex</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+</Flow>

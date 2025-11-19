@@ -1,0 +1,411 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>59.0</apiVersion>
+    <description>Test flow to manually create a QuickBooks invoice from an Opportunity. Use this to test the integration on any Opportunity record.</description>
+    <environments>Default</environments>
+    <interviewLabel>Test QuickBooks Invoice Creation {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Test QuickBooks Invoice Creation</label>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>OriginBuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>Flow</processType>
+    <actionCalls>
+        <description>Call the QuickBooks Invoice Invocable action</description>
+        <name>Create_QuickBooks_Invoice</name>
+        <label>Create QuickBooks Invoice</label>
+        <locationX>176</locationX>
+        <locationY>1094</locationY>
+        <actionName>QuickBooksInvoiceInvocable</actionName>
+        <actionType>apex</actionType>
+        <connector>
+            <targetReference>Check_Invoice_Success</targetReference>
+        </connector>
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <inputParameters>
+            <name>requests</name>
+            <value>
+                <elementReference>invoiceRequest</elementReference>
+            </value>
+        </inputParameters>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </actionCalls>
+    <assignments>
+        <description>Set up the invoice request parameters</description>
+        <name>Setup_Invoice_Request</name>
+        <label>Setup Invoice Request</label>
+        <locationX>176</locationX>
+        <locationY>974</locationY>
+        <assignmentItems>
+            <assignToReference>invoiceRequest.opportunityId</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>recordId</elementReference>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>invoiceRequest.companyId</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>CompanyIdInput</elementReference>
+            </value>
+        </assignmentItems>
+        <connector>
+            <targetReference>Create_QuickBooks_Invoice</targetReference>
+        </connector>
+    </assignments>
+    <decisions>
+        <description>Check if this opportunity already has a QuickBooks invoice</description>
+        <name>Check_Existing_Invoice</name>
+        <label>Check Existing Invoice</label>
+        <locationX>176</locationX>
+        <locationY>734</locationY>
+        <defaultConnector>
+            <targetReference>Setup_Invoice_Request</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>No Existing Invoice</defaultConnectorLabel>
+        <rules>
+            <name>Has_Existing_Invoice</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>Get_Opportunity_Details.QuickBooks_Invoice_Id__c</leftValueReference>
+                <operator>IsNull</operator>
+                <rightValue>
+                    <booleanValue>false</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Existing_Invoice_Warning</targetReference>
+            </connector>
+            <label>Has Existing Invoice</label>
+        </rules>
+    </decisions>
+    <decisions>
+        <description>Check if invoice creation was successful</description>
+        <name>Check_Invoice_Success</name>
+        <label>Check Invoice Success</label>
+        <locationX>176</locationX>
+        <locationY>1214</locationY>
+        <defaultConnector>
+            <targetReference>Error_Screen</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>Creation Failed</defaultConnectorLabel>
+        <rules>
+            <name>Invoice_Created_Successfully</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>Create_QuickBooks_Invoice.success</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <booleanValue>true</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Success_Screen</targetReference>
+            </connector>
+            <label>Invoice Created Successfully</label>
+        </rules>
+    </decisions>
+    <recordLookups>
+        <description>Get the full Opportunity record with Account and Line Items</description>
+        <name>Get_Opportunity_Details</name>
+        <label>Get Opportunity Details</label>
+        <locationX>176</locationX>
+        <locationY>134</locationY>
+        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Get_QuickBooks_Config</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Id</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>recordId</elementReference>
+            </value>
+        </filters>
+        <getFirstRecordOnly>true</getFirstRecordOnly>
+        <object>Opportunity</object>
+        <queriedFields>Id</queriedFields>
+        <queriedFields>Name</queriedFields>
+        <queriedFields>AccountId</queriedFields>
+        <queriedFields>Amount</queriedFields>
+        <queriedFields>CloseDate</queriedFields>
+        <queriedFields>StageName</queriedFields>
+        <queriedFields>QuickBooks_Invoice_Id__c</queriedFields>
+        <queriedFields>QuickBooks_Invoice_Number__c</queriedFields>
+        <queriedFields>QuickBooks_Sync_Status__c</queriedFields>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
+    <recordLookups>
+        <description>Get QuickBooks configuration settings</description>
+        <name>Get_QuickBooks_Config</name>
+        <label>Get QuickBooks Config</label>
+        <locationX>176</locationX>
+        <locationY>254</locationY>
+        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Get_Account_Info</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>DeveloperName</field>
+            <operator>EqualTo</operator>
+            <value>
+                <stringValue>Default</stringValue>
+            </value>
+        </filters>
+        <getFirstRecordOnly>true</getFirstRecordOnly>
+        <object>QuickBooks_Config__mdt</object>
+        <queriedFields>Id</queriedFields>
+        <queriedFields>Company_Id__c</queriedFields>
+        <queriedFields>Is_Sandbox__c</queriedFields>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
+    <recordLookups>
+        <description>Get the related Account information</description>
+        <name>Get_Account_Info</name>
+        <label>Get Account Info</label>
+        <locationX>176</locationX>
+        <locationY>374</locationY>
+        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Get_Opportunity_Products</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Id</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>Get_Opportunity_Details.AccountId</elementReference>
+            </value>
+        </filters>
+        <getFirstRecordOnly>true</getFirstRecordOnly>
+        <object>Account</object>
+        <queriedFields>Id</queriedFields>
+        <queriedFields>Name</queriedFields>
+        <queriedFields>QuickBooks_Customer_Id__c</queriedFields>
+        <queriedFields>BillingStreet</queriedFields>
+        <queriedFields>BillingCity</queriedFields>
+        <queriedFields>BillingState</queriedFields>
+        <queriedFields>BillingPostalCode</queriedFields>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
+    <recordLookups>
+        <description>Get all line items for this opportunity</description>
+        <name>Get_Opportunity_Products</name>
+        <label>Get Opportunity Products</label>
+        <locationX>176</locationX>
+        <locationY>494</locationY>
+        <assignNullValuesIfNoRecordsFound>true</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Pre_Creation_Screen</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>OpportunityId</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>recordId</elementReference>
+            </value>
+        </filters>
+        <object>OpportunityLineItem</object>
+        <outputReference>opportunityLineItems</outputReference>
+        <queriedFields>Id</queriedFields>
+        <queriedFields>Product2Id</queriedFields>
+        <queriedFields>ProductCode</queriedFields>
+        <queriedFields>Name</queriedFields>
+        <queriedFields>Quantity</queriedFields>
+        <queriedFields>UnitPrice</queriedFields>
+        <queriedFields>TotalPrice</queriedFields>
+        <queriedFields>Description</queriedFields>
+    </recordLookups>
+    <screens>
+        <description>Show opportunity details and confirm invoice creation</description>
+        <name>Pre_Creation_Screen</name>
+        <label>Review Opportunity Details</label>
+        <locationX>176</locationX>
+        <locationY>614</locationY>
+        <allowBack>true</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>false</allowPause>
+        <connector>
+            <targetReference>Check_Existing_Invoice</targetReference>
+        </connector>
+        <fields>
+            <name>HeaderText</name>
+            <fieldText>&lt;p&gt;&lt;b style=&quot;font-size: 18px;&quot;&gt;QuickBooks Invoice Creation Test&lt;/b&gt;&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;This flow will create an invoice in QuickBooks for the following opportunity:&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <fields>
+            <name>OpportunityInfo</name>
+            <fieldText>&lt;p&gt;&lt;b&gt;Opportunity Details:&lt;/b&gt;&lt;/p&gt;&lt;p&gt;Name: {!Get_Opportunity_Details.Name}&lt;/p&gt;&lt;p&gt;Amount: ${!Get_Opportunity_Details.Amount}&lt;/p&gt;&lt;p&gt;Close Date: {!Get_Opportunity_Details.CloseDate}&lt;/p&gt;&lt;p&gt;Stage: {!Get_Opportunity_Details.StageName}&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;&lt;b&gt;Account:&lt;/b&gt; {!Get_Account_Info.Name}&lt;/p&gt;&lt;p&gt;QuickBooks Customer ID: {!Get_Account_Info.QuickBooks_Customer_Id__c}&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <fields>
+            <name>LineItemsInfo</name>
+            <fieldText>&lt;p&gt;&lt;b&gt;Line Items:&lt;/b&gt;&lt;/p&gt;&lt;p&gt;Number of products: {!opportunityLineItems}&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+            <visibilityRule>
+                <conditionLogic>and</conditionLogic>
+                <conditions>
+                    <leftValueReference>opportunityLineItems</leftValueReference>
+                    <operator>IsNull</operator>
+                    <rightValue>
+                        <booleanValue>false</booleanValue>
+                    </rightValue>
+                </conditions>
+            </visibilityRule>
+        </fields>
+        <fields>
+            <name>NoLineItemsWarning</name>
+            <fieldText>&lt;p&gt;&lt;span style=&quot;color: rgb(194, 57, 52);&quot;&gt;⚠️ Warning: This opportunity has no line items. The invoice will be created but may have no line items.&lt;/span&gt;&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+            <visibilityRule>
+                <conditionLogic>and</conditionLogic>
+                <conditions>
+                    <leftValueReference>opportunityLineItems</leftValueReference>
+                    <operator>IsNull</operator>
+                    <rightValue>
+                        <booleanValue>true</booleanValue>
+                    </rightValue>
+                </conditions>
+            </visibilityRule>
+        </fields>
+        <fields>
+            <name>CompanyIdInput</name>
+            <dataType>String</dataType>
+            <defaultValue>
+                <elementReference>Get_QuickBooks_Config.Company_Id__c</elementReference>
+            </defaultValue>
+            <fieldText>QuickBooks Company ID</fieldText>
+            <fieldType>InputField</fieldType>
+            <helpText>&lt;p&gt;The QuickBooks Company ID (Realm ID) to use for this invoice. Default value comes from QuickBooks Config metadata.&lt;/p&gt;</helpText>
+            <isRequired>true</isRequired>
+        </fields>
+        <fields>
+            <name>ConfirmationCheckbox</name>
+            <dataType>Boolean</dataType>
+            <defaultValue>
+                <booleanValue>false</booleanValue>
+            </defaultValue>
+            <fieldText>I want to create this invoice in QuickBooks</fieldText>
+            <fieldType>InputField</fieldType>
+            <isRequired>true</isRequired>
+        </fields>
+        <showFooter>true</showFooter>
+        <showHeader>false</showHeader>
+    </screens>
+    <screens>
+        <description>Warn about existing invoice</description>
+        <name>Existing_Invoice_Warning</name>
+        <label>Existing Invoice Warning</label>
+        <locationX>440</locationX>
+        <locationY>854</locationY>
+        <allowBack>true</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>false</allowPause>
+        <connector>
+            <targetReference>Setup_Invoice_Request</targetReference>
+        </connector>
+        <fields>
+            <name>ExistingInvoiceWarning</name>
+            <fieldText>&lt;p&gt;&lt;span style=&quot;color: rgb(194, 57, 52); font-size: 16px;&quot;&gt;&lt;b&gt;⚠️ Warning: Existing Invoice Found&lt;/b&gt;&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;This opportunity already has a QuickBooks invoice:&lt;/p&gt;&lt;p&gt;Invoice ID: {!Get_Opportunity_Details.QuickBooks_Invoice_Id__c}&lt;/p&gt;&lt;p&gt;Invoice Number: {!Get_Opportunity_Details.QuickBooks_Invoice_Number__c}&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;Creating a new invoice may result in duplicates in QuickBooks.&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <fields>
+            <name>ProceedAnyway</name>
+            <dataType>Boolean</dataType>
+            <defaultValue>
+                <booleanValue>false</booleanValue>
+            </defaultValue>
+            <fieldText>Create new invoice anyway</fieldText>
+            <fieldType>InputField</fieldType>
+            <isRequired>true</isRequired>
+        </fields>
+        <showFooter>true</showFooter>
+        <showHeader>false</showHeader>
+    </screens>
+    <screens>
+        <description>Show success message with invoice details</description>
+        <name>Success_Screen</name>
+        <label>Invoice Created Successfully</label>
+        <locationX>50</locationX>
+        <locationY>1334</locationY>
+        <allowBack>false</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>false</allowPause>
+        <fields>
+            <name>SuccessMessage</name>
+            <fieldText>&lt;p&gt;&lt;span style=&quot;color: rgb(0, 128, 0); font-size: 20px;&quot;&gt;&lt;b&gt;✅ Invoice Created Successfully!&lt;/b&gt;&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;&lt;b&gt;Invoice Details:&lt;/b&gt;&lt;/p&gt;&lt;p&gt;QuickBooks Invoice ID: {!Create_QuickBooks_Invoice.quickBooksInvoiceId}&lt;/p&gt;&lt;p&gt;Invoice Number: {!Create_QuickBooks_Invoice.quickBooksInvoiceNumber}&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;The opportunity has been updated with the QuickBooks invoice information.&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;&lt;b&gt;Next Steps:&lt;/b&gt;&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Log into QuickBooks to view the invoice&lt;/li&gt;&lt;li&gt;Send the invoice to your customer&lt;/li&gt;&lt;li&gt;Track payment status in QuickBooks&lt;/li&gt;&lt;/ul&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <showFooter>true</showFooter>
+        <showHeader>false</showHeader>
+    </screens>
+    <screens>
+        <description>Show error message if invoice creation failed</description>
+        <name>Error_Screen</name>
+        <label>Invoice Creation Failed</label>
+        <locationX>308</locationX>
+        <locationY>1334</locationY>
+        <allowBack>false</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>false</allowPause>
+        <fields>
+            <name>ErrorMessage</name>
+            <fieldText>&lt;p&gt;&lt;span style=&quot;color: rgb(194, 57, 52); font-size: 20px;&quot;&gt;&lt;b&gt;❌ Invoice Creation Failed&lt;/b&gt;&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;&lt;b&gt;Error Details:&lt;/b&gt;&lt;/p&gt;&lt;p&gt;{!Create_QuickBooks_Invoice.message}&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;&lt;b&gt;Troubleshooting Steps:&lt;/b&gt;&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Verify QuickBooks authentication is active&lt;/li&gt;&lt;li&gt;Check if the Company ID is correct&lt;/li&gt;&lt;li&gt;Ensure the Account has valid customer data&lt;/li&gt;&lt;li&gt;Verify opportunity has line items with products&lt;/li&gt;&lt;li&gt;Check Integration Logs for detailed error messages&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;&lt;b&gt;Common Issues:&lt;/b&gt;&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Expired QuickBooks token - Re-authenticate via QuickBooks OAuth tab&lt;/li&gt;&lt;li&gt;Missing product mappings - Ensure products have QuickBooks Item IDs&lt;/li&gt;&lt;li&gt;Invalid customer data - Check Account billing address&lt;/li&gt;&lt;/ul&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <showFooter>true</showFooter>
+        <showHeader>false</showHeader>
+    </screens>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Get_Opportunity_Details</targetReference>
+        </connector>
+    </start>
+    <variables>
+        <description>Store the invoice request data</description>
+        <name>invoiceRequest</name>
+        <apexClass>QuickBooksInvoiceRequest</apexClass>
+        <dataType>Apex</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <description>Collection to store opportunity line items</description>
+        <name>opportunityLineItems</name>
+        <dataType>SObject</dataType>
+        <isCollection>true</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+        <objectType>OpportunityLineItem</objectType>
+    </variables>
+    <variables>
+        <description>The Opportunity record ID</description>
+        <name>recordId</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <status>Draft</status>
+</Flow>

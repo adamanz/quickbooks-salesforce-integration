@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>65.0</apiVersion>
+    <decisions>
+        <name>Day_of_Week</name>
+        <label>Day of Week</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <defaultConnector>
+            <targetReference>Lead_Daily_Send</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>Default Outcome</defaultConnectorLabel>
+        <rules>
+            <name>Weekends</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>Weekend</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <booleanValue>true</booleanValue>
+                </rightValue>
+            </conditions>
+            <label>Weekend</label>
+        </rules>
+    </decisions>
+    <environments>Default</environments>
+    <formulas>
+        <name>Weekend</name>
+        <dataType>Boolean</dataType>
+        <expression>OR(
+    TEXT(WEEKDAY({!$Flow.CurrentDate})) = &quot;1&quot;,
+    TEXT(WEEKDAY({!$Flow.CurrentDate})) = &quot;7&quot;
+  )</expression>
+    </formulas>
+    <interviewLabel>Lead Daily AutoLaunch {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Lead Daily AutoLaunch</label>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>OriginBuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>AutoLaunchedFlow</processType>
+    <start>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Day_of_Week</targetReference>
+        </connector>
+        <schedule>
+            <frequency>Daily</frequency>
+            <startDate>2025-10-30</startDate>
+            <startTime>11:15:00.000Z</startTime>
+        </schedule>
+        <triggerType>Scheduled</triggerType>
+    </start>
+    <status>Active</status>
+    <subflows>
+        <name>Lead_Daily_Send</name>
+        <label>Lead Daily Send</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <flowName>Lead_Queue_Send_Auto_Launch</flowName>
+    </subflows>
+</Flow>

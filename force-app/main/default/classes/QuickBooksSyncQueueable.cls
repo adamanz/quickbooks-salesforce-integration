@@ -35,6 +35,9 @@ public class QuickBooksSyncQueueable implements Queueable, Database.AllowsCallou
                 when 'Payment' {
                     syncPayments();
                 }
+                when 'Estimate' {
+                    syncEstimates();
+                }
                 when 'Item' {
                     syncItems();
                 }
@@ -128,6 +131,86 @@ public class QuickBooksSyncQueueable implements Queueable, Database.AllowsCallou
                 logError('Item sync failed: ' + itemId, e.getMessage());
             }
         }
+    }
+
+    /**
+     * Sync Estimate data from QuickBooks to Salesforce
+     */
+    private void syncEstimates() {
+        for (String estimateId : entityIds) {
+            try {
+                // Fetch estimate data from QuickBooks
+                Map<String, Object> estimateData = fetchEntityFromQuickBooks('estimate', estimateId);
+
+                if (estimateData != null) {
+                    // Find or create Estimate in Salesforce
+                    Estimate__c estimate = findOrCreateEstimate(estimateData);
+
+                    // Update Estimate fields
+                    updateEstimateFromQuickBooks(estimate, estimateData);
+                }
+            } catch (Exception e) {
+                logError('Estimate sync failed: ' + estimateId, e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Find or create Estimate based on QuickBooks estimate data
+     */
+    private Estimate__c findOrCreateEstimate(Map<String, Object> estimateData) {
+        String qbEstimateId = (String) estimateData.get('Id');
+
+        // Try to find existing Estimate
+        List<Estimate__c> estimates = [
+            SELECT Id, QuickBooks_Estimate_Id__c
+            FROM Estimate__c
+            WHERE QuickBooks_Estimate_Id__c = :qbEstimateId
+            LIMIT 1
+        ];
+
+        if (!estimates.isEmpty()) {
+            return estimates[0];
+        }
+
+        // Create new Estimate
+        Estimate__c estimate = new Estimate__c();
+        estimate.QuickBooks_Estimate_Id__c = qbEstimateId;
+        return estimate;
+    }
+
+    /**
+     * Update Estimate from QuickBooks estimate data
+     */
+    private void updateEstimateFromQuickBooks(Estimate__c estimate, Map<String, Object> estimateData) {
+        estimate.Estimate_Amount__c = (Decimal) estimateData.get('TotalAmt');
+        estimate.QuickBooks_Estimate_Number__c = (String) estimateData.get('DocNumber');
+        estimate.Status__c = (String) estimateData.get('TxnStatus');
+        
+        String txnDateStr = (String) estimateData.get('TxnDate');
+        if (txnDateStr != null) {
+            estimate.Estimate_Date__c = Date.valueOf(txnDateStr.substring(0, 10));
+        }
+        
+        String expDateStr = (String) estimateData.get('ExpirationDate');
+        if (expDateStr != null) {
+            estimate.Expiration_Date__c = Date.valueOf(expDateStr.substring(0, 10));
+        }
+        
+        // Link to Account
+        Map<String, Object> customerRef = (Map<String, Object>) estimateData.get('CustomerRef');
+        if (customerRef != null) {
+            String customerId = (String) customerRef.get('value');
+            List<Account> accounts = [SELECT Id FROM Account WHERE QuickBooks_Customer_Id__c = :customerId LIMIT 1];
+            if (!accounts.isEmpty()) {
+                estimate.Related_Account__c = accounts[0].Id;
+            }
+        }
+
+        estimate.QuickBooks_Sync_Status__c = 'Synced';
+        estimate.QuickBooks_Last_Sync__c = DateTime.now();
+
+        upsert estimate QuickBooks_Estimate_Id__c;
     }
 
     /**
@@ -250,9 +333,49 @@ public class QuickBooksSyncQueueable implements Queueable, Database.AllowsCallou
      * Process payment data - create/update custom payment records
      */
     private void processPaymentData(Map<String, Object> paymentData) {
-        // Implementation depends on your payment tracking requirements
-        // Could create custom Payment__c records or update Opportunity fields
-        System.debug('Processing payment: ' + paymentData);
+        String qbPaymentId = (String) paymentData.get('Id');
+        
+        // Try to find existing Payment
+        Payment__c payment;
+        List<Payment__c> payments = [
+            SELECT Id, QuickBooks_Payment_Id__c
+            FROM Payment__c
+            WHERE QuickBooks_Payment_Id__c = :qbPaymentId
+            LIMIT 1
+        ];
+        
+        if (!payments.isEmpty()) {
+            payment = payments[0];
+        } else {
+            payment = new Payment__c();
+            payment.QuickBooks_Payment_Id__c = qbPaymentId;
+        }
+        
+        // Map fields
+        payment.Payment_Amount__c = (Decimal) paymentData.get('TotalAmt');
+        
+        String txnDateStr = (String) paymentData.get('TxnDate');
+        if (txnDateStr != null) {
+            payment.Payment_Date__c = Date.valueOf(txnDateStr.substring(0, 10));
+            payment.Transaction_Date__c = payment.Payment_Date__c;
+        }
+        
+        payment.Payment_Reference_Number__c = (String) paymentData.get('PaymentRefNum');
+        payment.Notes__c = (String) paymentData.get('PrivateNote');
+        
+        // Map Customer Reference to Account
+        Map<String, Object> customerRef = (Map<String, Object>) paymentData.get('CustomerRef');
+        if (customerRef != null) {
+            String customerId = (String) customerRef.get('value');
+            List<Account> accounts = [SELECT Id FROM Account WHERE QuickBooks_Customer_Id__c = :customerId LIMIT 1];
+            if (!accounts.isEmpty()) {
+                payment.Related_Account__c = accounts[0].Id;
+            }
+        }
+        
+        payment.QuickBooks_Sync_Status__c = 'Synced';
+        
+        upsert payment QuickBooks_Payment_Id__c;
     }
 
     /**

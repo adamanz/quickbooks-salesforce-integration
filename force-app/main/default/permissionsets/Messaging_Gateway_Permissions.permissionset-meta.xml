@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <classAccesses>
+        <apexClass>QuickBooksWebhookSimple</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <description>Permissions for Messaging Gateway Site Guest User</description>
+    <hasActivationRequired>false</hasActivationRequired>
+    <label>Messaging Gateway Permissions</label>
+</PermissionSet>

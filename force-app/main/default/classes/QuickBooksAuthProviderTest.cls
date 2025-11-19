@@ -179,6 +179,34 @@ private class QuickBooksAuthProviderTest {
         Test.stopTest();
     }
 
+    @isTest
+    static void testGetCompanyId() {
+        String companyId = QuickBooksAuthProvider.getCompanyId();
+        System.assertEquals('TEST_COMPANY_123', companyId);
+    }
+
+    @isTest
+    static void testGetValidAccessTokenNoArgs() {
+        // Setup HTTP mock in case refresh is needed
+        Test.setMock(HttpCalloutMock.class, new AuthProviderHttpMock('token_refresh_success'));
+
+        // Create auth with valid token
+        QuickBooks_Auth__c auth = new QuickBooks_Auth__c(
+            Company_Id__c = 'TEST_COMPANY_VALID_2',
+            Access_Token__c = 'valid_access_token_2',
+            Refresh_Token__c = 'refresh_token_2',
+            Token_Expiry__c = DateTime.now().addHours(1), // Valid for 1 hour
+            Is_Active__c = true
+        );
+        insert auth;
+
+        Test.startTest();
+        String accessToken = QuickBooksAuthProvider.getValidAccessToken();
+        Test.stopTest();
+
+        System.assertNotEquals(null, accessToken);
+    }
+
     /**
      * Test initiate auth flow
      */
@@ -199,6 +227,66 @@ private class QuickBooksAuthProviderTest {
         System.assert(url.contains('scope='));
         System.assert(url.contains('response_type=code'));
         System.assert(url.contains('state='));
+    }
+
+    /**
+     * Test configuration validation
+     */
+    @isTest
+    static void testValidateConfiguration() {
+        Test.startTest();
+        Map<String, Object> validationResult = QuickBooksAuthProvider.validateConfiguration();
+        Test.stopTest();
+
+        System.assertNotEquals(null, validationResult, 'Validation result should not be null');
+        System.assert(validationResult.containsKey('isValid'), 'Result should contain isValid key');
+        System.assert(validationResult.containsKey('errors'), 'Result should contain errors key');
+        System.assert(validationResult.containsKey('warnings'), 'Result should contain warnings key');
+    }
+
+    /**
+     * Test initiateAuthFlow with warnings
+     */
+    @isTest
+    static void testInitiateAuthFlowWithWarnings() {
+        Test.startTest();
+        PageReference authPage = QuickBooksAuthProvider.initiateAuthFlow();
+        Test.stopTest();
+
+        System.assertNotEquals(null, authPage);
+        String url = authPage.getUrl();
+        System.assert(url.contains('client_id='));
+        System.assert(url.contains('state='));
+    }
+
+    /**
+     * Test getCompanyId when no auth exists
+     */
+    @isTest
+    static void testGetCompanyIdNoAuth() {
+        // Delete all auth records
+        delete [SELECT Id FROM QuickBooks_Auth__c];
+
+        Test.startTest();
+        try {
+            QuickBooksAuthProvider.getCompanyId();
+            System.assert(false, 'Should throw exception');
+        } catch (QuickBooksAuthProvider.QuickBooksException e) {
+            System.assert(e.getMessage().contains('No active QuickBooks authentication'));
+        }
+        Test.stopTest();
+    }
+
+    /**
+     * Test exception handling
+     */
+    @isTest
+    static void testQuickBooksException() {
+        try {
+            throw new QuickBooksAuthProvider.QuickBooksException('Test exception message');
+        } catch (QuickBooksAuthProvider.QuickBooksException e) {
+            System.assertEquals('Test exception message', e.getMessage());
+        }
     }
 
     /**

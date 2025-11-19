@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <actionCalls>
+        <name>Send_Test_Message</name>
+        <label>Send Test Message</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <actionName>SendblueQueueableSimple</actionName>
+        <actionType>apex</actionType>
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <inputParameters>
+            <name>firstName</name>
+            <value>
+                <stringValue>Test</stringValue>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>lastName</name>
+            <value>
+                <stringValue>User</stringValue>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>message</name>
+            <value>
+                <stringValue>Test message from new queueable - SendblueQueueableSimple</stringValue>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>recipientNumber</name>
+            <value>
+                <stringValue>+18016031605</stringValue>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>opportunityId</name>
+            <value>
+                <stringValue>006Hr00001QQqAEIA1</stringValue>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>ownerEmail</name>
+            <value>
+                <stringValue>test@example.com</stringValue>
+            </value>
+        </inputParameters>
+        <nameSegment>SendblueQueueableSimple</nameSegment>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </actionCalls>
+    <apiVersion>64.0</apiVersion>
+    <description>Test Flow for SendblueQueueableSimple - sends single test message</description>
+    <environments>Default</environments>
+    <interviewLabel>Test SendblueQueueableSimple {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Test SendblueQueueableSimple</label>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>OriginBuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>AutoLaunchedFlow</processType>
+    <start>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Send_Test_Message</targetReference>
+        </connector>
+    </start>
+    <status>Draft</status>
+</Flow>

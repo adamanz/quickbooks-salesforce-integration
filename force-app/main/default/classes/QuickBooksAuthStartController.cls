@@ -1,8 +1,9 @@
 /**
  * Controller for QuickBooksAuthStart page
  * Initiates OAuth 2.0 flow with QuickBooks
+ * Note: Uses without sharing to allow Site Guest User access for OAuth initiation
  */
-public with sharing class QuickBooksAuthStartController {
+public without sharing class QuickBooksAuthStartController {
     public Boolean isProcessing { get; private set; }
     public Boolean isError { get; private set; }
     public String errorMessage { get; private set; }

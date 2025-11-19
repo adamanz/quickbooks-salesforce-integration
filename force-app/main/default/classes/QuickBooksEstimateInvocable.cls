@@ -1,7 +1,6 @@
 /**
  * QuickBooks Estimate Invocable Service
  * Provides invocable action for creating QuickBooks Estimates from Salesforce Flow
- * Separated into its own class to comply with Salesforce's one @InvocableMethod per class requirement
  */
 public with sharing class QuickBooksEstimateInvocable {
 
@@ -12,22 +11,27 @@ public with sharing class QuickBooksEstimateInvocable {
     @InvocableMethod(label='Create QuickBooks Estimate'
                      description='Creates an estimate in QuickBooks with multiple line items'
                      category='QuickBooks')
-    public static List<EstimateResponse> createEstimate(List<EstimateRequest> requests) {
-        List<EstimateResponse> responses = new List<EstimateResponse>();
+    public static List<QuickBooksEstimateResponse> createEstimate(List<QuickBooksEstimateRequest> requests) {
+        List<QuickBooksEstimateResponse> responses = new List<QuickBooksEstimateResponse>();
 
-        for (EstimateRequest request : requests) {
-            EstimateResponse response = new EstimateResponse();
+        for (QuickBooksEstimateRequest request : requests) {
+            QuickBooksEstimateResponse response = new QuickBooksEstimateResponse();
             response.salesforceOpportunityId = request.opportunityId;
 
             try {
                 // Get Opportunity and related data
                 Opportunity opp = getOpportunityWithLineItems(request.opportunityId);
 
-                // For now, assume customer is already created in QB
-                // If customer ID is not present, this will fail at API call time
+                // Get customer ID from Account field or from request
                 String customerIdValue = getCustomerIdFromAccount(opp.AccountId);
+
+                // Allow request.customerRef to override if Account field is not set
+                if (String.isBlank(customerIdValue) && String.isNotBlank(request.customerRef)) {
+                    customerIdValue = request.customerRef;
+                }
+
                 if (String.isBlank(customerIdValue)) {
-                    throw new QuickBooksException('Account must have a QuickBooks Customer ID. Please create the customer first using "Create QuickBooks Customer" action.');
+                    throw new QuickBooksException('Must provide customerRef in request or Account must have QuickBooks_Customer_Id__c field set. Please create the customer first using "Create QuickBooks Customer" action.');
                 }
 
                 // Build estimate data with line items
@@ -87,35 +91,48 @@ public with sharing class QuickBooksEstimateInvocable {
     /**
      * Build estimate data for QuickBooks API with line items and discount
      */
-    private static Map<String, Object> buildEstimateData(Opportunity opp, EstimateRequest request, String customerId) {
+    private static Map<String, Object> buildEstimateData(Opportunity opp, QuickBooksEstimateRequest request, String customerId) {
         Map<String, Object> estimate = new Map<String, Object>();
 
         // Customer reference
         Map<String, Object> customerRef = new Map<String, Object>();
         customerRef.put('value', customerId);
+        if (String.isNotBlank(request.customerName)) {
+            customerRef.put('name', request.customerName);
+        }
         estimate.put('CustomerRef', customerRef);
 
-        // Line items from Opportunity or from request
-        List<Map<String, Object>> itemLines = new List<Map<String, Object>>();
+        // Line items array - QuickBooks expects 'Line' not 'itemLines'
+        List<Map<String, Object>> lines = new List<Map<String, Object>>();
+        Decimal subtotal = 0;
+
+        // Parse line items from JSON if provided
+        if (String.isNotBlank(request.lineItemsJson)) {
+            request.parseLineItems();
+        }
 
         if (request.lineItems != null && !request.lineItems.isEmpty()) {
             // Use line items passed from Flow
-            Integer sequence = 1;
-            for (EstimateLineItem lineItem : request.lineItems) {
-                Map<String, Object> line = buildEstimateLineItem(lineItem, sequence);
-                itemLines.add(line);
-                sequence++;
+            Integer lineNum = 1;
+            for (QuickBooksEstimateLineItem lineItem : request.lineItems) {
+                Map<String, Object> line = buildQuickBooksLineItem(lineItem, lineNum);
+                lines.add(line);
+                subtotal += lineItem.amount != null ? lineItem.amount : (lineItem.quantity * lineItem.unitPrice);
+                lineNum++;
             }
-        } else {
+        } else if (opp.OpportunityLineItems != null && !opp.OpportunityLineItems.isEmpty()) {
             // Fall back to Opportunity line items
-            Integer sequence = 1;
+            Integer lineNum = 1;
             for (OpportunityLineItem oli : opp.OpportunityLineItems) {
                 Map<String, Object> line = new Map<String, Object>();
-                line.put('sequence', String.valueOf(sequence));
-                line.put('amount', oli.TotalPrice);
-                line.put('description', oli.Product2.Name);
-                line.put('quantity', oli.Quantity);
-                line.put('unitPrice', oli.UnitPrice);
+                line.put('LineNum', lineNum);
+                line.put('Amount', oli.TotalPrice);
+                line.put('Description', oli.Product2.Name);
+                line.put('DetailType', 'SalesItemLineDetail');
+
+                Map<String, Object> detail = new Map<String, Object>();
+                detail.put('Qty', oli.Quantity);
+                detail.put('UnitPrice', oli.UnitPrice);
 
                 // Try to get QB Item ID if it exists
                 try {
@@ -124,42 +141,76 @@ public with sharing class QuickBooksEstimateInvocable {
                     if (qbItemId != null) {
                         Map<String, Object> itemRef = new Map<String, Object>();
                         itemRef.put('value', qbItemId);
-                        line.put('item', itemRef);
+                        itemRef.put('name', oli.Product2.Name);
+                        detail.put('ItemRef', itemRef);
                     }
                 } catch (Exception e) {
                     System.debug('Note: Could not get QB Item ID: ' + e.getMessage());
                 }
 
-                itemLines.add(line);
-                sequence++;
+                // Tax code reference
+                if (String.isNotBlank(request.taxCodeRef)) {
+                    Map<String, Object> taxCodeRef = new Map<String, Object>();
+                    taxCodeRef.put('value', request.taxCodeRef);
+                    detail.put('TaxCodeRef', taxCodeRef);
+                }
+
+                line.put('SalesItemLineDetail', detail);
+                lines.add(line);
+                subtotal += oli.TotalPrice;
+                lineNum++;
             }
         }
 
-        estimate.put('itemLines', itemLines);
+        // Add SubTotal line
+        if (!lines.isEmpty()) {
+            Map<String, Object> subTotalLine = new Map<String, Object>();
+            subTotalLine.put('DetailType', 'SubTotalLineDetail');
+            subTotalLine.put('Amount', subtotal);
+            subTotalLine.put('SubTotalLineDetail', new Map<String, Object>());
+            lines.add(subTotalLine);
+        }
 
-        // Handle discount
-        if (request.discountAmount != null && request.discountAmount > 0) {
-            Map<String, Object> discount = new Map<String, Object>();
-            Map<String, Object> discountAmount = new Map<String, Object>();
-            discountAmount.put('value', request.discountAmount);
-            discount.put('amount', discountAmount);
-            discount.put('applyTaxAfterDiscount', request.applyTaxAfterDiscount != null ?
-                                                 request.applyTaxAfterDiscount : true);
-            estimate.put('discount', discount);
+        // Add Discount line if applicable
+        if ((request.discountPercent != null && request.discountPercent > 0) ||
+            (request.discountAmount != null && request.discountAmount > 0)) {
+            Map<String, Object> discountLine = new Map<String, Object>();
+            discountLine.put('DetailType', 'DiscountLineDetail');
+
+            Map<String, Object> discountDetail = new Map<String, Object>();
+
+            if (request.discountPercent != null && request.discountPercent > 0) {
+                discountDetail.put('PercentBased', true);
+                discountDetail.put('DiscountPercent', request.discountPercent);
+                discountLine.put('Amount', subtotal * request.discountPercent / 100);
+            } else {
+                discountDetail.put('PercentBased', false);
+                discountLine.put('Amount', request.discountAmount);
+            }
+
+            discountLine.put('DiscountLineDetail', discountDetail);
+            lines.add(discountLine);
+        }
+
+        estimate.put('Line', lines);
+
+        // Apply Tax After Discount setting
+        if (request.applyTaxAfterDiscount != null) {
+            estimate.put('ApplyTaxAfterDiscount', request.applyTaxAfterDiscount);
         }
 
         // Transaction date
         if (request.estimateDate != null) {
-            estimate.put('TxnDate', request.estimateDate.format());
+            estimate.put('TxnDate', String.valueOf(request.estimateDate));
         } else {
-            estimate.put('TxnDate', Date.today().format());
+            estimate.put('TxnDate', String.valueOf(Date.today()));
         }
 
         // Expiration date (default: 30 days)
         if (request.expirationDate != null) {
-            estimate.put('ExpirationDate', request.expirationDate.format());
+            estimate.put('ExpirationDate', String.valueOf(request.expirationDate));
         } else {
-            estimate.put('ExpirationDate', Date.today().addDays(30).format());
+            estimate.put('ExpirationDate', String.valueOf(Date.today().addDays(30)));
         }
 
         // Reference number (optional)
@@ -169,43 +220,109 @@ public with sharing class QuickBooksEstimateInvocable {
 
         // Customer memo (optional)
         if (String.isNotBlank(request.customerMemo)) {
-            estimate.put('CustomerMemo', request.customerMemo);
+            Map<String, Object> memo = new Map<String, Object>();
+            memo.put('value', request.customerMemo);
+            estimate.put('CustomerMemo', memo);
         }
 
         // Private memo (optional)
         if (String.isNotBlank(request.privateMemo)) {
-            estimate.put('PrivateMemo', request.privateMemo);
+            Map<String, Object> memo = new Map<String, Object>();
+            memo.put('value', request.privateMemo);
+            estimate.put('PrivateMemo', memo);
+        }
+
+        // Bill Email (optional)
+        if (String.isNotBlank(request.customerEmail)) {
+            Map<String, Object> billEmail = new Map<String, Object>();
+            billEmail.put('Address', request.customerEmail);
+            estimate.put('BillEmail', billEmail);
+        }
+
+        // Billing address (optional)
+        if (String.isNotBlank(request.billToAddress)) {
+            Map<String, Object> billAddr = new Map<String, Object>();
+            // Parse address if it contains multiple parts separated by comma
+            String[] addressParts = request.billToAddress.split(',');
+            if (addressParts.size() > 0) billAddr.put('Line1', addressParts[0].trim());
+            if (addressParts.size() > 1) billAddr.put('City', addressParts[1].trim());
+            if (addressParts.size() > 2) billAddr.put('CountrySubDivisionCode', addressParts[2].trim());
+            if (addressParts.size() > 3) billAddr.put('PostalCode', addressParts[3].trim());
+            estimate.put('BillAddr', billAddr);
         }
 
         // Shipping address (optional)
         if (String.isNotBlank(request.shipToAddress)) {
-            Map<String, Object> shipping = new Map<String, Object>();
             Map<String, Object> shipAddr = new Map<String, Object>();
-            shipAddr.put('Line1', request.shipToAddress);
-            shipping.put('ShipAddress', shipAddr);
-            estimate.put('Shipping', shipping);
+            // Parse address if it contains multiple parts separated by comma
+            String[] addressParts = request.shipToAddress.split(',');
+            if (addressParts.size() > 0) shipAddr.put('Line1', addressParts[0].trim());
+            if (addressParts.size() > 1) shipAddr.put('City', addressParts[1].trim());
+            if (addressParts.size() > 2) shipAddr.put('CountrySubDivisionCode', addressParts[2].trim());
+            if (addressParts.size() > 3) shipAddr.put('PostalCode', addressParts[3].trim());
+            estimate.put('ShipAddr', shipAddr);
         }
+
+        // Currency reference (for multi-currency companies)
+        if (String.isNotBlank(request.currencyRef)) {
+            Map<String, Object> currencyRef = new Map<String, Object>();
+            currencyRef.put('value', request.currencyRef);
+            estimate.put('CurrencyRef', currencyRef);
+        }
+
+        // Tax detail (if needed)
+        Map<String, Object> txnTaxDetail = new Map<String, Object>();
+        txnTaxDetail.put('TotalTax', 0); // You can calculate this if needed
+        estimate.put('TxnTaxDetail', txnTaxDetail);
 
         return estimate;
     }
 
     /**
-     * Build individual estimate line item
+     * Build individual QuickBooks line item with proper format
      */
-    private static Map<String, Object> buildEstimateLineItem(EstimateLineItem lineItem, Integer sequence) {
+    private static Map<String, Object> buildQuickBooksLineItem(QuickBooksEstimateLineItem lineItem, Integer lineNum) {
         Map<String, Object> line = new Map<String, Object>();
 
-        line.put('sequence', String.valueOf(sequence));
-        line.put('amount', lineItem.amount);
-        line.put('description', lineItem.description);
-        line.put('quantity', lineItem.quantity);
-        line.put('unitPrice', lineItem.unitPrice);
+        line.put('LineNum', lineNum);
+        line.put('Amount', lineItem.amount != null ? lineItem.amount : (lineItem.quantity * lineItem.unitPrice));
 
-        // Item reference (QB Item ID)
-        if (String.isNotBlank(lineItem.quickBooksItemId)) {
-            Map<String, Object> itemRef = new Map<String, Object>();
-            itemRef.put('value', lineItem.quickBooksItemId);
-            line.put('item', itemRef);
+        if (String.isNotBlank(lineItem.description)) {
+            line.put('Description', lineItem.description);
+        }
+
+        // Determine detail type
+        String detailType = String.isNotBlank(lineItem.detailType) ? lineItem.detailType : 'SalesItemLineDetail';
+        line.put('DetailType', detailType);
+
+        // Build the detail object based on type
+        if (detailType == 'SalesItemLineDetail') {
+            Map<String, Object> detail = new Map<String, Object>();
+            detail.put('Qty', lineItem.quantity != null ? lineItem.quantity : 1);
+            detail.put('UnitPrice', lineItem.unitPrice != null ? lineItem.unitPrice : 0);
+
+            // Item reference
+            if (String.isNotBlank(lineItem.itemRef)) {
+                Map<String, Object> itemRef = new Map<String, Object>();
+                itemRef.put('value', lineItem.itemRef);
+                if (String.isNotBlank(lineItem.itemName)) {
+                    itemRef.put('name', lineItem.itemName);
+                }
+                detail.put('ItemRef', itemRef);
+            }
+
+            // Tax code reference
+            if (String.isNotBlank(lineItem.taxCodeRef)) {
+                Map<String, Object> taxCodeRef = new Map<String, Object>();
+                taxCodeRef.put('value', lineItem.taxCodeRef);
+                detail.put('TaxCodeRef', taxCodeRef);
+            }
+
+            line.put('SalesItemLineDetail', detail);
+        } else if (detailType == 'GroupLineDetail') {
+            Map<String, Object> detail = new Map<String, Object>();
+            // Add group-specific fields as needed
+            line.put('GroupLineDetail', detail);
         }
 
         return line;
@@ -255,7 +372,7 @@ public with sharing class QuickBooksEstimateInvocable {
     /**
      * Handle API error response
      */
-    private static void handleAPIError(HttpResponse response, EstimateResponse responseObj) {
+    private static void handleAPIError(HttpResponse response, QuickBooksEstimateResponse responseObj) {
         Map<String, Object> error = (Map<String, Object>)
             JSON.deserializeUntyped(response.getBody());
 
@@ -301,88 +418,5 @@ public with sharing class QuickBooksEstimateInvocable {
         insert log;
     }
 
-    // ==================== Request/Response Classes ====================
-
-    /**
-     * Estimate creation request - supports multiple line items
-     */
-    public class EstimateRequest {
-        @InvocableVariable(label='Salesforce Opportunity ID' required=true)
-        public Id opportunityId;
-
-        @InvocableVariable(label='QuickBooks Company ID' required=true)
-        public String companyId;
-
-        @InvocableVariable(label='Estimate Line Items')
-        public List<EstimateLineItem> lineItems;
-
-        @InvocableVariable(label='Discount Amount')
-        public Decimal discountAmount;
-
-        @InvocableVariable(label='Apply Tax After Discount')
-        public Boolean applyTaxAfterDiscount;
-
-        @InvocableVariable(label='Estimate Date')
-        public Date estimateDate;
-
-        @InvocableVariable(label='Expiration Date')
-        public Date expirationDate;
-
-        @InvocableVariable(label='Reference Number')
-        public String referenceNumber;
-
-        @InvocableVariable(label='Customer Memo')
-        public String customerMemo;
-
-        @InvocableVariable(label='Private Memo')
-        public String privateMemo;
-
-        @InvocableVariable(label='Ship To Address')
-        public String shipToAddress;
-    }
-
-    /**
-     * Estimate line item for Flow input
-     */
-    public class EstimateLineItem {
-        @InvocableVariable(label='Description' required=true)
-        public String description;
-
-        @InvocableVariable(label='Quantity' required=true)
-        public Decimal quantity;
-
-        @InvocableVariable(label='Unit Price' required=true)
-        public Decimal unitPrice;
-
-        @InvocableVariable(label='Amount' required=true)
-        public Decimal amount;
-
-        @InvocableVariable(label='QuickBooks Item ID')
-        public String quickBooksItemId;
-    }
-
-    /**
-     * Estimate creation response
-     */
-    public class EstimateResponse {
-        @InvocableVariable(label='Success')
-        public Boolean success;
-
-        @InvocableVariable(label='Message')
-        public String message;
-
-        @InvocableVariable(label='QuickBooks Estimate ID')
-        public String quickBooksEstimateId;
-
-        @InvocableVariable(label='QuickBooks Estimate Number')
-        public String quickBooksEstimateNumber;
-
-        @InvocableVariable(label='Salesforce Opportunity ID')
-        public Id salesforceOpportunityId;
-    }
-
-    /**
-     * Custom exception class
-     */
     public class QuickBooksException extends Exception {}
 }

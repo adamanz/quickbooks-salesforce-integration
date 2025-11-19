@@ -20,28 +20,49 @@ private class QuickBooksSyncQueueableTest {
 
         // Create test Account
         Account testAccount = new Account(
-            Name = 'Sync Test Company',
-            QuickBooks_Customer_Id__c = 'QB_CUST_001'
+            Name = 'Sync Test Company'
         );
         insert testAccount;
+
+        // Dynamically set QuickBooks custom fields using SObject.put()
+        try {
+            testAccount.put('QuickBooks_Customer_Id__c', 'QB_CUST_001');
+            update testAccount;
+        } catch (Exception e) {
+            System.debug('Note: QuickBooks custom fields not in schema: ' + e.getMessage());
+        }
 
         // Create test Opportunity
         Opportunity testOpp = new Opportunity(
             Name = 'Sync Test Opportunity',
             AccountId = testAccount.Id,
             StageName = 'Prospecting',
-            CloseDate = Date.today().addDays(30),
-            QuickBooks_Invoice_Id__c = 'QB_INV_001'
+            CloseDate = Date.today().addDays(30)
         );
         insert testOpp;
+
+        // Dynamically set QuickBooks custom fields
+        try {
+            testOpp.put('QuickBooks_Invoice_Id__c', 'QB_INV_001');
+            update testOpp;
+        } catch (Exception e) {
+            System.debug('Note: QuickBooks custom fields not in schema: ' + e.getMessage());
+        }
 
         // Create test Product
         Product2 testProduct = new Product2(
             Name = 'Sync Test Product',
-            QuickBooks_Item_Id__c = 'QB_ITEM_001',
             IsActive = true
         );
         insert testProduct;
+
+        // Dynamically set QuickBooks custom fields
+        try {
+            testProduct.put('QuickBooks_Item_Id__c', 'QB_ITEM_001');
+            update testProduct;
+        } catch (Exception e) {
+            System.debug('Note: QuickBooks custom fields not in schema: ' + e.getMessage());
+        }
 
         // Create standard pricebook entry
         Id pricebookId = Test.getStandardPricebookId();
@@ -132,9 +153,46 @@ private class QuickBooksSyncQueueableTest {
         System.enqueueJob(job);
         Test.stopTest();
 
-        // Verify job executed without errors
-        // Payment processing is logged but may not create records depending on implementation
-        System.assert(true, 'Payment sync completed');
+        // Verify Payment record was created
+        Payment__c payment = [
+            SELECT Payment_Amount__c, Payment_Reference_Number__c, Notes__c, Related_Account__c
+            FROM Payment__c
+            WHERE QuickBooks_Payment_Id__c = 'QB_PAY_001'
+        ];
+        System.assertEquals(500.00, payment.Payment_Amount__c);
+        System.assertEquals('REF-123', payment.Payment_Reference_Number__c);
+        System.assertNotEquals(null, payment.Related_Account__c);
+    }
+
+    /**
+     * Test Estimate sync from QuickBooks
+     */
+    @isTest
+    static void testSyncEstimates_Success() {
+        // Setup HTTP mock
+        Test.setMock(HttpCalloutMock.class, new SyncQueueableHttpMock('estimate_success'));
+
+        List<String> estimateIds = new List<String>{'QB_EST_001'};
+        QuickBooksSyncQueueable job = new QuickBooksSyncQueueable(
+            'Estimate',
+            estimateIds,
+            'TEST_COMPANY_123'
+        );
+
+        Test.startTest();
+        System.enqueueJob(job);
+        Test.stopTest();
+
+        // Verify Estimate record was created
+        Estimate__c estimate = [
+            SELECT Estimate_Amount__c, QuickBooks_Estimate_Number__c, Status__c, Related_Account__c
+            FROM Estimate__c
+            WHERE QuickBooks_Estimate_Id__c = 'QB_EST_001'
+        ];
+        System.assertEquals(2000.00, estimate.Estimate_Amount__c);
+        System.assertEquals('EST-1001', estimate.QuickBooks_Estimate_Number__c);
+        System.assertEquals('Accepted', estimate.Status__c);
+        System.assertNotEquals(null, estimate.Related_Account__c);
     }
 
     /**
@@ -335,6 +393,10 @@ private class QuickBooksSyncQueueableTest {
                     response.setStatusCode(200);
                     response.setBody(buildPaymentResponse());
                 }
+                when 'estimate_success' {
+                    response.setStatusCode(200);
+                    response.setBody(buildEstimateResponse());
+                }
                 when 'item_success', 'item_new' {
                     response.setStatusCode(200);
                     response.setBody(buildItemResponse(responseType == 'item_new'));
@@ -381,9 +443,32 @@ private class QuickBooksSyncQueueableTest {
         private String buildPaymentResponse() {
             Map<String, Object> payment = new Map<String, Object>{
                 'Id' => 'QB_PAY_001',
-                'TotalAmt' => 500.00
+                'TotalAmt' => 500.00,
+                'TxnDate' => '2023-01-01',
+                'PaymentRefNum' => 'REF-123',
+                'PrivateNote' => 'Test Note',
+                'CustomerRef' => new Map<String, Object>{
+                    'value' => 'QB_CUST_001',
+                    'name' => 'Test Customer'
+                }
             };
             return JSON.serialize(new Map<String, Object>{'Payment' => payment});
+        }
+
+        private String buildEstimateResponse() {
+            Map<String, Object> estimate = new Map<String, Object>{
+                'Id' => 'QB_EST_001',
+                'DocNumber' => 'EST-1001',
+                'TotalAmt' => 2000.00,
+                'TxnDate' => '2023-02-01',
+                'ExpirationDate' => '2023-03-01',
+                'TxnStatus' => 'Accepted',
+                'CustomerRef' => new Map<String, Object>{
+                    'value' => 'QB_CUST_001',
+                    'name' => 'Test Customer'
+                }
+            };
+            return JSON.serialize(new Map<String, Object>{'Estimate' => estimate});
         }
 
         private String buildItemResponse(Boolean isNew) {

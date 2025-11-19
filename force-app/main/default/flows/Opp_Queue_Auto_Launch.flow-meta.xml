@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>65.0</apiVersion>
+    <decisions>
+        <name>Day_of_Week</name>
+        <label>Day of Week</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <defaultConnector>
+            <targetReference>Opp_Queue_Auto_Launch</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>Default Outcome</defaultConnectorLabel>
+        <rules>
+            <name>Weekend</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>Weekends</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <booleanValue>true</booleanValue>
+                </rightValue>
+            </conditions>
+            <label>Weekend</label>
+        </rules>
+    </decisions>
+    <environments>Default</environments>
+    <formulas>
+        <name>Weekends</name>
+        <dataType>Boolean</dataType>
+        <expression>OR(
+    TEXT(WEEKDAY({!$Flow.CurrentDate})) = &quot;1&quot;,
+    TEXT(WEEKDAY({!$Flow.CurrentDate})) = &quot;7&quot;
+  )</expression>
+    </formulas>
+    <interviewLabel>Opp Queue Auto Launch {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Opp Queue Auto Launch</label>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>OriginBuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>AutoLaunchedFlow</processType>
+    <start>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Day_of_Week</targetReference>
+        </connector>
+        <schedule>
+            <frequency>Daily</frequency>
+            <startDate>2025-10-29</startDate>
+            <startTime>12:00:00.000Z</startTime>
+        </schedule>
+        <triggerType>Scheduled</triggerType>
+    </start>
+    <status>Active</status>
+    <subflows>
+        <name>Opp_Queue_Auto_Launch</name>
+        <label>Opp Queue Auto Launch</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <flowName>Opp_Queue_Send_Auto_Launch</flowName>
+    </subflows>
+</Flow>

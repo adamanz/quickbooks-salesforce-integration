@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>63.0</apiVersion>
+    <description>Simple demonstration of bulkified message sending - shows that the SendMessage action accepts multiple inputs at once to avoid uncommitted work errors</description>
+    <environments>Default</environments>
+    <interviewLabel>Sendblue Bulk Demo Simple {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Sendblue Bulk Demo Simple</label>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>OriginBuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>Flow</processType>
+    <screens>
+        <name>Introduction</name>
+        <label>Bulkification Demo</label>
+        <locationX>176</locationX>
+        <locationY>158</locationY>
+        <allowBack>false</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>false</allowPause>
+        <fields>
+            <name>IntroductionText</name>
+            <fieldText>&lt;p&gt;&lt;b style=&quot;font-size: 18px;&quot;&gt;Sendblue Bulk Message Sending Demo&lt;/b&gt;&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;This flow demonstrates the proper way to avoid &quot;You have uncommitted work pending&quot; errors when sending multiple messages.&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;&lt;b style=&quot;color: rgb(27, 95, 51);&quot;&gt;✓ CORRECT Approach (Bulkification):&lt;/b&gt;&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Collect all message data first&lt;/li&gt;&lt;li&gt;Pass entire collection to SendMessage action ONCE&lt;/li&gt;&lt;li&gt;The action handles all messages in a single transaction&lt;/li&gt;&lt;li&gt;No callout/DML conflicts occur&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;&lt;b style=&quot;color: rgb(194, 57, 52);&quot;&gt;✗ INCORRECT Approach (Looping):&lt;/b&gt;&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Loop element iterates over records&lt;/li&gt;&lt;li&gt;SendMessage action called inside the loop&lt;/li&gt;&lt;li&gt;First iteration: callout + uncommitted DML&lt;/li&gt;&lt;li&gt;Second iteration: ERROR - uncommitted work pending&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;&lt;b&gt;Key Point:&lt;/b&gt; The SendMessage invocable method accepts a List of inputs and processes them all together. Use this capability!&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot;background-color: rgb(255, 241, 118);&quot;&gt;Note: This is a demonstration flow. In production, you would query records and build the collection dynamically.&lt;/span&gt;&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <showFooter>true</showFooter>
+        <showHeader>true</showHeader>
+    </screens>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Introduction</targetReference>
+        </connector>
+    </start>
+    <status>Draft</status>
+</Flow>

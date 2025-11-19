@@ -216,8 +216,21 @@ global with sharing class QuickBooksWebhookHandler {
      * Handle Estimate entity changes
      */
     private static void handleEstimateChange(EventNotification notification) {
-        // Implementation for estimate sync
-        System.debug('Estimate changed: ' + notification);
+        List<String> estimateIds = new List<String>();
+
+        for (Entity entity : notification.dataChangeEvent.entities) {
+            estimateIds.add(entity.id);
+        }
+
+        // Queue job to sync estimate data
+        if (!estimateIds.isEmpty()) {
+            QuickBooksSyncQueueable job = new QuickBooksSyncQueueable(
+                'Estimate',
+                estimateIds,
+                notification.realmId
+            );
+            System.enqueueJob(job);
+        }
     }
 
     /**

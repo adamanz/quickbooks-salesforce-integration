@@ -4,14 +4,22 @@
     <protected>false</protected>
     <values>
         <field>Client_Id__c</field>
-        <value xsi:type="xsd:string">ABVXMjcDNzYm3f969avshDh9lXGB1kkAwLiDP2hpSIFBcKRmJZ</value>
+        <value xsi:type="xsd:string">ABy4w6bF6ZyTExnTwTFb2T79PqHnKeObAMelDjIo82trwlWR56</value>
     </values>
     <values>
         <field>Client_Secret__c</field>
-        <value xsi:type="xsd:string">LvDScfQyE0VPOAgTh5P6EzRnw2D06OxkdLk04DM5</value>
+        <value xsi:type="xsd:string">TZWUPSFoSZiyVFTcnH8IRUAvzqBlPFbt1EbPxXPR</value>
+    </values>
+    <values>
+        <field>Is_Sandbox__c</field>
+        <value xsi:type="xsd:boolean">false</value>
     </values>
     <values>
         <field>Redirect_URI__c</field>
-        <value xsi:type="xsd:string">https://oxycell.my.salesforce-sites.com/MessagingGateway/QuickBooksAuthCallback</value>
+        <value xsi:type="xsd:string">https://oxycell.my.salesforce-sites.com/MessagingGateway/services/apexrest/quickbooks/callback</value>
+    </values>
+    <values>
+        <field>Webhook_Verifier_Token__c</field>
+        <value xsi:type="xsd:string">84914756-c24b-4e4a-8bda-84db13845e73</value>
     </values>
 </CustomMetadata>

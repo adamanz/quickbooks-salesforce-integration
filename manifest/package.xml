@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>QuickBooksEstimateInvocable</members>
+        <members>QuickBooksEstimateInvocableTest</members>
+        <members>QuickBooksEstimateLineItem</members>
+        <members>QuickBooksEstimateRequest</members>
+        <members>QuickBooksEstimateResponse</members>
+        <members>QuickBooksEstimateTestHelper</members>
+        <members>QuickBooksEstimateSimpleInvocable</members>
+        <members>QuickBooksDTOs</members>
+        <members>QuickBooksAPIServiceSimple</members>
+        <members>QuickBooksAuthHelper</members>
+        <name>ApexClass</name>
+    </types>
+    <types>
+        <members>QuickBooks_Create_MultiLine_Estimate</members>
+        <name>Flow</name>
+    </types>
+    <version>59.0</version>
+</Package>

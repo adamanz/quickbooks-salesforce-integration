@@ -24,20 +24,111 @@
         </value>
     </processMetadataValues>
     <processType>AutoLaunchedFlow</processType>
-
-    <!-- Start element -->
-    <start>
-        <locationX>50</locationX>
-        <locationY>0</locationY>
+    <actionCalls>
+        <description>Create an invoice in QuickBooks</description>
+        <name>Create_QuickBooks_Invoice</name>
+        <label>Create QuickBooks Invoice</label>
+        <locationX>176</locationX>
+        <locationY>815</locationY>
+        <actionName>QuickBooksInvoiceInvocable</actionName>
+        <actionType>apex</actionType>
         <connector>
-            <targetReference>Check_Closed_Won</targetReference>
+            <targetReference>Check_Invoice_Creation_Success</targetReference>
         </connector>
-        <object>Opportunity</object>
-        <recordTriggerType>Update</recordTriggerType>
-        <triggerType>RecordAfterSave</triggerType>
-    </start>
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <inputParameters>
+            <name>requests</name>
+            <value>
+                <elementReference>invoiceRequest</elementReference>
+            </value>
+        </inputParameters>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </actionCalls>
+    <actionCalls>
+        <description>Send email notification about QuickBooks invoice creation error</description>
+        <name>Send_Invoice_Error_Email</name>
+        <label>Send Invoice Error Email</label>
+        <locationX>308</locationX>
+        <locationY>1055</locationY>
+        <actionName>emailSimple</actionName>
+        <actionType>emailSimple</actionType>
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <inputParameters>
+            <name>emailBody</name>
+            <value>
+                <stringValue>Failed to create QuickBooks invoice for Opportunity: {!$Record.Name}
 
-    <!-- Decision: Check if Opportunity is Closed Won -->
+Error Message: {!Create_QuickBooks_Invoice.message}
+
+Opportunity ID: {!$Record.Id}
+Account: {!$Record.Account.Name}
+Amount: {!$Record.Amount}</stringValue>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>emailAddresses</name>
+            <value>
+                <stringValue>{!$Setup.QuickBooks_Config__c.Admin_Email__c}</stringValue>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>emailSubject</name>
+            <value>
+                <stringValue>QuickBooks Integration Error - Invoice Creation Failed</stringValue>
+            </value>
+        </inputParameters>
+    </actionCalls>
+    <actionCalls>
+        <description>Send chatter notification about successful invoice creation</description>
+        <name>Send_Success_Notification</name>
+        <label>Send Success Notification</label>
+        <locationX>50</locationX>
+        <locationY>1055</locationY>
+        <actionName>chatterPost</actionName>
+        <actionType>chatterPost</actionType>
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <inputParameters>
+            <name>text</name>
+            <value>
+                <stringValue>✅ QuickBooks Invoice Created Successfully!
+
+Invoice Number: {!Create_QuickBooks_Invoice.quickBooksInvoiceNumber}
+QuickBooks Invoice ID: {!Create_QuickBooks_Invoice.quickBooksInvoiceId}
+
+The invoice has been automatically created in QuickBooks for this Closed Won opportunity.</stringValue>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>subjectNameOrId</name>
+            <value>
+                <elementReference>$Record.Id</elementReference>
+            </value>
+        </inputParameters>
+    </actionCalls>
+    <assignments>
+        <description>Assign values to the invoice request object</description>
+        <name>Assign_Invoice_Request</name>
+        <label>Assign Invoice Request</label>
+        <locationX>176</locationX>
+        <locationY>695</locationY>
+        <assignmentItems>
+            <assignToReference>invoiceRequest.opportunityId</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>$Record.Id</elementReference>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>invoiceRequest.companyId</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>$Setup.QuickBooks_Config__c.Company_Id__c</elementReference>
+            </value>
+        </assignmentItems>
+        <connector>
+            <targetReference>Create_QuickBooks_Invoice</targetReference>
+        </connector>
+    </assignments>
     <decisions>
         <description>Check if the Opportunity stage is Closed Won</description>
         <name>Check_Closed_Won</name>
@@ -70,13 +161,60 @@
                 </rightValue>
             </conditions>
             <connector>
-                <targetReference>Check_Line_Items</targetReference>
+                <targetReference>Get_Opportunity_Line_Items</targetReference>
             </connector>
             <label>Is Closed Won</label>
         </rules>
     </decisions>
-
-    <!-- Get Opportunity Line Items -->
+    <decisions>
+        <description>Check if the QuickBooks invoice creation was successful</description>
+        <name>Check_Invoice_Creation_Success</name>
+        <label>Check Invoice Creation Success</label>
+        <locationX>176</locationX>
+        <locationY>935</locationY>
+        <defaultConnector>
+            <targetReference>Send_Invoice_Error_Email</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>Creation Failed</defaultConnectorLabel>
+        <rules>
+            <name>Invoice_Creation_Successful</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>Create_QuickBooks_Invoice.success</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <booleanValue>true</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Send_Success_Notification</targetReference>
+            </connector>
+            <label>Creation Successful</label>
+        </rules>
+    </decisions>
+    <decisions>
+        <description>Check if the Opportunity has line items</description>
+        <name>Check_Line_Items</name>
+        <label>Check Line Items</label>
+        <locationX>176</locationX>
+        <locationY>575</locationY>
+        <defaultConnectorLabel>No Line Items</defaultConnectorLabel>
+        <rules>
+            <name>Has_Line_Items</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>Get_Opportunity_Line_Items</leftValueReference>
+                <operator>IsNull</operator>
+                <rightValue>
+                    <booleanValue>false</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Assign_Invoice_Request</targetReference>
+            </connector>
+            <label>Has Line Items</label>
+        </rules>
+    </decisions>
     <recordLookups>
         <description>Get Opportunity Line Items for the invoice</description>
         <name>Get_Opportunity_Line_Items</name>
@@ -99,163 +237,24 @@
         <object>OpportunityLineItem</object>
         <storeOutputAutomatically>true</storeOutputAutomatically>
     </recordLookups>
-
-    <!-- Decision: Check if Opportunity has line items -->
-    <decisions>
-        <description>Check if the Opportunity has line items</description>
-        <name>Check_Line_Items</name>
-        <label>Check Line Items</label>
-        <locationX>176</locationX>
-        <locationY>575</locationY>
-        <defaultConnectorLabel>No Line Items</defaultConnectorLabel>
-        <rules>
-            <name>Has_Line_Items</name>
-            <conditionLogic>and</conditionLogic>
-            <conditions>
-                <leftValueReference>Get_Opportunity_Line_Items</leftValueReference>
-                <operator>IsNull</operator>
-                <rightValue>
-                    <booleanValue>false</booleanValue>
-                </rightValue>
-            </conditions>
-            <connector>
-                <targetReference>Create_QuickBooks_Invoice</targetReference>
-            </connector>
-            <label>Has Line Items</label>
-        </rules>
-    </decisions>
-
-    <!-- Action: Call Apex to create QuickBooks Invoice -->
-    <actionCalls>
-        <description>Create an invoice in QuickBooks</description>
-        <name>Create_QuickBooks_Invoice</name>
-        <label>Create QuickBooks Invoice</label>
-        <locationX>176</locationX>
-        <locationY>695</locationY>
-        <actionName>QuickBooksAPIService</actionName>
-        <actionType>apex</actionType>
-        <connector>
-            <targetReference>Check_Invoice_Creation_Success</targetReference>
-        </connector>
-        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
-        <inputParameters>
-            <name>requests</name>
-            <value>
-                <elementReference>invoiceRequest</elementReference>
-            </value>
-        </inputParameters>
-        <storeOutputAutomatically>true</storeOutputAutomatically>
-    </actionCalls>
-
-    <!-- Decision: Check if invoice creation was successful -->
-    <decisions>
-        <description>Check if the QuickBooks invoice creation was successful</description>
-        <name>Check_Invoice_Creation_Success</name>
-        <label>Check Invoice Creation Success</label>
-        <locationX>176</locationX>
-        <locationY>815</locationY>
-        <defaultConnector>
-            <targetReference>Send_Invoice_Error_Email</targetReference>
-        </defaultConnector>
-        <defaultConnectorLabel>Creation Failed</defaultConnectorLabel>
-        <rules>
-            <name>Invoice_Creation_Successful</name>
-            <conditionLogic>and</conditionLogic>
-            <conditions>
-                <leftValueReference>Create_QuickBooks_Invoice.success</leftValueReference>
-                <operator>EqualTo</operator>
-                <rightValue>
-                    <booleanValue>true</booleanValue>
-                </rightValue>
-            </conditions>
-            <connector>
-                <targetReference>Send_Success_Notification</targetReference>
-            </connector>
-            <label>Creation Successful</label>
-        </rules>
-    </decisions>
-
-    <!-- Send success notification -->
-    <actionCalls>
-        <description>Send chatter notification about successful invoice creation</description>
-        <name>Send_Success_Notification</name>
-        <label>Send Success Notification</label>
+    <start>
         <locationX>50</locationX>
-        <locationY>935</locationY>
-        <actionName>chatterPost</actionName>
-        <actionType>chatterPost</actionType>
-        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
-        <inputParameters>
-            <name>text</name>
-            <value>
-                <stringValue>✅ QuickBooks Invoice Created Successfully!
-
-Invoice Number: {!Create_QuickBooks_Invoice.quickBooksInvoiceNumber}
-QuickBooks Invoice ID: {!Create_QuickBooks_Invoice.quickBooksInvoiceId}
-
-The invoice has been automatically created in QuickBooks for this Closed Won opportunity.</stringValue>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>subjectNameOrId</name>
-            <value>
-                <elementReference>$Record.Id</elementReference>
-            </value>
-        </inputParameters>
-    </actionCalls>
-
-    <!-- Send error email notification -->
-    <actionCalls>
-        <description>Send email notification about QuickBooks invoice creation error</description>
-        <name>Send_Invoice_Error_Email</name>
-        <label>Send Invoice Error Email</label>
-        <locationX>308</locationX>
-        <locationY>935</locationY>
-        <actionName>emailSimple</actionName>
-        <actionType>emailSimple</actionType>
-        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
-        <inputParameters>
-            <name>emailBody</name>
-            <value>
-                <stringValue>Failed to create QuickBooks invoice for Opportunity: {!$Record.Name}
-
-Error Message: {!Create_QuickBooks_Invoice.message}
-
-Opportunity ID: {!$Record.Id}
-Account: {!$Record.Account.Name}
-Amount: {!$Record.Amount}</stringValue>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>emailAddresses</name>
-            <value>
-                <stringValue>{!$Setup.QuickBooks_Config__c.Admin_Email__c}</stringValue>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>emailSubject</name>
-            <value>
-                <stringValue>QuickBooks Integration Error - Invoice Creation Failed</stringValue>
-            </value>
-        </inputParameters>
-    </actionCalls>
-
-    <!-- Variables -->
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Check_Closed_Won</targetReference>
+        </connector>
+        <object>Opportunity</object>
+        <recordTriggerType>Update</recordTriggerType>
+        <triggerType>RecordAfterSave</triggerType>
+    </start>
+    <status>Draft</status>
     <variables>
         <description>Request object for creating QuickBooks invoice</description>
         <name>invoiceRequest</name>
-        <apexClass>QuickBooksAPIService.InvoiceRequest</apexClass>
+        <apexClass>QuickBooksInvoiceRequest</apexClass>
         <dataType>Apex</dataType>
         <isCollection>false</isCollection>
         <isInput>false</isInput>
         <isOutput>false</isOutput>
-        <value>
-            <apexValue>
-                <opportunityId>{!$Record.Id}</opportunityId>
-                <companyId>{!$Setup.QuickBooks_Config__c.Company_Id__c}</companyId>
-            </apexValue>
-        </value>
     </variables>
-
-    <status>Draft</status>
 </Flow>

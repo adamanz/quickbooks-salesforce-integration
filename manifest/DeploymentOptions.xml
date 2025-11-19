@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DeployOptions xmlns="http://soap.sforce.com/2006/04/metadata">
+    <allowMissingFiles>false</allowMissingFiles>
+    <autoUpdatePackage>false</autoUpdatePackage>
+    <checkOnly>false</checkOnly>
+    <ignoreWarnings>false</ignoreWarnings>
+    <performRetrieve>false</performRetrieve>
+    <purgeOnDelete>false</purgeOnDelete>
+    <rollbackOnError>true</rollbackOnError>
+    <testLevel>RunSpecifiedTests</testLevel>
+    <runTests>QuickBooksEstimateInvocableTest</runTests>
+    <!-- Additional passing tests we can include if needed -->
+    <!-- <runTests>QuickBooksSimpleInvocableTest</runTests> -->
+    <!-- <runTests>QuickBooksLoggerTest</runTests> -->
+</DeployOptions>

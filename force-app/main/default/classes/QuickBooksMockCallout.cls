@@ -34,6 +34,12 @@ global class QuickBooksMockCallout implements HttpCalloutMock {
         response.setStatusCode(statusCode);
         response.setHeader('Content-Type', 'application/json');
 
+        // If a specific response body was provided (e.g. for error testing), use it
+        if (responseBody != null) {
+            response.setBody(responseBody);
+            return response;
+        }
+
         // Determine response based on endpoint
         if (endpoint.contains('/estimate')) {
             response.setBody(getEstimateResponse());
@@ -44,7 +50,7 @@ global class QuickBooksMockCallout implements HttpCalloutMock {
         } else if (endpoint.contains('/tokens/bearer')) {
             response.setBody(getTokenResponse());
         } else {
-            response.setBody(responseBody != null ? responseBody : getDefaultResponse());
+            response.setBody(getDefaultResponse());
         }
 
         return response;

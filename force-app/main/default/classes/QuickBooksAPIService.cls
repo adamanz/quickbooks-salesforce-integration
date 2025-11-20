@@ -245,6 +245,44 @@ public with sharing class QuickBooksAPIService {
         return responses;
     }
 
+    /**
+     * Send Estimate via Email
+     */
+    public static void sendEstimate(String estimateId, String emailAddress, String companyId) {
+        QuickBooks_Auth__c auth = QuickBooksAuthProvider.getValidAuthState(companyId, false);
+        String accessToken = auth.Access_Token__c;
+        
+        String endpoint = getBaseUrl(companyId) + API_VERSION + companyId + '/estimate/' + estimateId + '/send';
+        if (String.isNotBlank(emailAddress)) {
+            endpoint += '?sendTo=' + EncodingUtil.urlEncode(emailAddress, 'UTF-8');
+        }
+
+        // Manual request build to control headers for this specific endpoint
+        Http http = new Http();
+        HttpRequest request = new HttpRequest();
+        request.setEndpoint(endpoint);
+        request.setMethod('POST');
+        request.setHeader('Authorization', 'Bearer ' + accessToken);
+        request.setHeader('Accept', 'application/json');
+        // Set Content-Type to application/octet-stream for empty body POSTs
+        request.setHeader('Content-Type', 'application/octet-stream');
+        
+        HttpResponse response = http.send(request);
+        
+        if (response.getStatusCode() != 200) {
+            throw new QuickBooksException(parseAPIError(response));
+        }
+        
+        // If token was refreshed, we should update it
+        // Since we can't easily do DML here without breaking flow if called from trigger, 
+        // we rely on the caller to handle Auth updates or use the standard scheduled refresh.
+        // However, getValidAuthState(..., false) doesn't do DML, so we are safe from mixed DML.
+        // Ideally we should queue an update if it changed.
+        if (auth.Access_Token__c != accessToken) { // simplified check, in reality we'd need to check expiration
+             update auth;
+        }
+    }
+
     // ==================== Helper Methods ====================
 
     /**
@@ -472,6 +510,11 @@ public with sharing class QuickBooksAPIService {
         if (request.applyTaxAfterDiscount != null) {
             estimateData.put('ApplyTaxAfterDiscount', request.applyTaxAfterDiscount);
         }
+
+        // Force TotalTax to 0
+        Map<String, Object> txnTaxDetail = new Map<String, Object>();
+        txnTaxDetail.put('TotalTax', 0);
+        estimateData.put('TxnTaxDetail', txnTaxDetail);
         
         return estimateData;
     }

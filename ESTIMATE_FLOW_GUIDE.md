@@ -120,9 +120,21 @@ Add a **Decision** element:
 ```
 Condition: {!EstimateResult.success} equals true
 
-True Path: Show success message, update Opportunity
+True Path: Proceed to Send Email (Optional) or Show Success
 False Path: Show error message - {!EstimateResult.message}
 ```
+
+### Step 7: Send Estimate via Email (Optional)
+
+To email the estimate immediately after creation:
+
+1. Add another **Action** element after the "Create QuickBooks Estimate" step (on the Success path).
+2. Search for: "Send QuickBooks Estimate"
+3. Select: `QuickBooksEstimateSendInvocable.sendEstimate`
+4. **Input:**
+   - Company ID: `{!Company_ID}` (or your constant)
+   - QuickBooks Estimate ID: `{!EstimateResult.quickBooksEstimateId}`
+   - Email Address: `{!Customer_Email}` (optional - overrides customer's default email)
 
 ---
 

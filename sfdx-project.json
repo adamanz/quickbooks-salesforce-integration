@@ -1,19 +1,24 @@
 {
-    "packageDirectories": [
-        {
-            "path": "force-app",
-            "default": true,
-            "package": "QuickBooksIntegration",
-            "versionName": "Version 1.0",
-            "versionNumber": "1.0.0.NEXT",
-            "versionDescription": "QuickBooks Online integration with Salesforce using OAuth 2.0 and invocable Flow actions"
-        }
-    ],
-    "name": "QuickBooks-Salesforce Integration",
-    "namespace": "",
-    "sfdcLoginUrl": "https://login.salesforce.com",
-    "sourceApiVersion": "59.0",
-    "packageAliases": {
-        "QuickBooksIntegration": "0Ho000000000000"
+  "packageDirectories": [
+    {
+      "versionName": "ver 0.1",
+      "versionNumber": "0.1.0.NEXT",
+      "path": "packages/quickbooks-core",
+      "default": true,
+      "package": "QuickBooksIntegration",
+      "versionDescription": "QuickBooks Online integration for Salesforce - OAuth 2.0, customers, estimates, invoices, payments"
+    },
+    {
+      "path": "force-app",
+      "default": false
     }
+  ],
+  "name": "QuickBooks-Salesforce Integration",
+  "namespace": "",
+  "sfdcLoginUrl": "https://login.salesforce.com",
+  "sourceApiVersion": "59.0",
+  "packageAliases": {
+    "QuickBooksIntegration": "0Hofo0000000FK1CAM",
+    "QuickBooksIntegration@0.1.0-1": "04tfo000001FYIXAA4"
+  }
 }

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>Default Configuration</label>
+    <protected>false</protected>
+    <values>
+        <field>Client_Id__c</field>
+        <value xsi:type="xsd:string">ABy4w6bF6ZyTExnTwTFb2T79PqHnKeObAMelDjIo82trwlWR56</value>
+    </values>
+    <values>
+        <field>Client_Secret__c</field>
+        <value xsi:type="xsd:string">TZWUPSFoSZiyVFTcnH8IRUAvzqBlPFbt1EbPxXPR</value>
+    </values>
+    <values>
+        <field>Is_Sandbox__c</field>
+        <value xsi:type="xsd:boolean">false</value>
+    </values>
+    <values>
+        <field>Redirect_URI__c</field>
+        <value xsi:type="xsd:string">https://oxycell.my.salesforce-sites.com/MessagingGateway/services/apexrest/quickbooks/callback</value>
+    </values>
+    <values>
+        <field>Webhook_Verifier_Token__c</field>
+        <value xsi:type="xsd:string">84914756-c24b-4e4a-8bda-84db13845e73</value>
+    </values>
+</CustomMetadata>

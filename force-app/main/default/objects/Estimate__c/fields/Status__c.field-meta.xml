@@ -27,9 +27,19 @@
                 <label>Rejected</label>
             </value>
             <value>
+                <fullName>Converted</fullName>
+                <default>false</default>
+                <label>Converted</label>
+            </value>
+            <value>
                 <fullName>Converted to Invoice</fullName>
                 <default>false</default>
                 <label>Converted to Invoice</label>
+            </value>
+            <value>
+                <fullName>Closed</fullName>
+                <default>false</default>
+                <label>Closed</label>
             </value>
         </valueSetDefinition>
     </valueSet>

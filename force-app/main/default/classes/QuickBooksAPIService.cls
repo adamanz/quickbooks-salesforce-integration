@@ -10,15 +10,15 @@ public with sharing class QuickBooksAPIService {
     private static final String BASE_URL_PRODUCTION = 'https://quickbooks.api.intuit.com';
 
     /**
-     * Create a QuickBooks customer from Salesforce Account
+     * Find or create a QuickBooks customer from Salesforce Account
+     * Returns existing customer ID if found, creates new if not
      */
     public static List<QuickBooksCustomerResponse> createCustomer(List<QuickBooksCustomerRequest> requests) {
         List<QuickBooksCustomerResponse> responses = new List<QuickBooksCustomerResponse>();
         Map<Id, Account> accountsToUpdate = new Map<Id, Account>();
         List<Integration_Log__c> logsToInsert = new List<Integration_Log__c>();
-        
+
         // Manage Auth Updates to prevent "Uncommitted Work" error
-        // We use a map to ensure we only update once per company if multiple requests
         Map<Id, QuickBooks_Auth__c> authsToUpdate = new Map<Id, QuickBooks_Auth__c>();
 
         // 1. Collect Account IDs
@@ -50,15 +50,21 @@ public with sharing class QuickBooksAPIService {
                 // Retrieve Token (Deferred DML)
                 QuickBooks_Auth__c auth = QuickBooksAuthProvider.getValidAuthState(request.companyId, false);
                 authsToUpdate.put(auth.Id, auth);
+                String accessToken = auth.Access_Token__c;
 
-                // Perform Callout using the token
-                String qbCustomerId = createCustomerCallout(acc, request.companyId, auth.Access_Token__c);
+                // Find existing or create new customer
+                String qbCustomerId = findOrCreateCustomer(acc, request, request.companyId, accessToken);
+
+                // Check if this was an existing customer or newly created
+                Boolean wasExisting = (acc.QuickBooks_Customer_Id__c == qbCustomerId);
 
                 response.quickBooksCustomerId = qbCustomerId;
                 response.success = true;
-                response.message = 'Customer created successfully';
+                response.message = wasExisting
+                    ? 'Found existing customer: ' + qbCustomerId
+                    : 'Customer created successfully: ' + qbCustomerId;
 
-                // Queue Account Update
+                // Queue Account Update (always update to ensure sync status is current)
                 Account accUpdate = new Account(
                     Id = acc.Id,
                     QuickBooks_Customer_Id__c = qbCustomerId,
@@ -77,7 +83,7 @@ public with sharing class QuickBooksAPIService {
 
         // 4. Perform DML
         if (!authsToUpdate.isEmpty()) {
-             update authsToUpdate.values(); // Update Auth tokens if they were refreshed
+             update authsToUpdate.values();
         }
         if (!accountsToUpdate.isEmpty()) {
             update accountsToUpdate.values();
@@ -274,111 +280,174 @@ public with sharing class QuickBooksAPIService {
         }
         
         // If token was refreshed, we should update it
-        // Since we can't easily do DML here without breaking flow if called from trigger, 
-        // we rely on the caller to handle Auth updates or use the standard scheduled refresh.
-        // However, getValidAuthState(..., false) doesn't do DML, so we are safe from mixed DML.
-        // Ideally we should queue an update if it changed.
-        if (auth.Access_Token__c != accessToken) { // simplified check, in reality we'd need to check expiration
+        if (auth.Access_Token__c != accessToken) { 
+             update auth;
+        }
+    }
+
+    /**
+     * Uploads a file to QuickBooks and attaches it to a record
+     */
+    public static void uploadAttachment(String recordId, String recordType, String fileName, String contentType, Blob fileContent, String companyId) {
+        QuickBooks_Auth__c auth = QuickBooksAuthProvider.getValidAuthState(companyId, false);
+        String accessToken = auth.Access_Token__c;
+        
+        String endpoint = getBaseUrl(companyId) + API_VERSION + companyId + '/upload';
+        
+        String boundary = '----------------------------' + String.valueOf(DateTime.now().getTime());
+        
+        // 1. Metadata Part
+        String metadataJson = '{' +
+            '"AttachableRef": [' +
+                '{' +
+                    '"EntityRef": {' +
+                        '"type": "' + recordType + '",' +
+                        '"value": "' + recordId + '"' +
+                    '}' +
+                '}' +
+            '],' +
+            '"FileName": "' + fileName + '",' +
+            '"ContentType": "' + contentType + '"' +
+        '}';
+
+        String bodyStart = '--' + boundary + '\r\n' +
+            'Content-Disposition: form-data; name="file_metadata_01"; filename="metadata.json"\r\n' +
+            'Content-Type: application/json\r\n\r\n' +
+            metadataJson + '\r\n' +
+            '--' + boundary + '\r\n' +
+            'Content-Disposition: form-data; name="file_content_01"; filename="' + fileName + '"\r\n' +
+            'Content-Type: ' + contentType + '\r\n\r\n';
+            
+        String bodyEnd = '\r\n--' + boundary + '--';
+        
+        // Construct the body using the Blob/Hex hack to merge String and Blob
+        String bodyStartHex = EncodingUtil.convertToHex(Blob.valueOf(bodyStart));
+        String fileHex = EncodingUtil.convertToHex(fileContent);
+        String bodyEndHex = EncodingUtil.convertToHex(Blob.valueOf(bodyEnd));
+        
+        HttpRequest req = new HttpRequest();
+        req.setEndpoint(endpoint);
+        req.setMethod('POST');
+        req.setHeader('Authorization', 'Bearer ' + accessToken);
+        req.setHeader('Content-Type', 'multipart/form-data; boundary=' + boundary);
+        req.setHeader('Accept', 'application/json');
+        
+        req.setBodyAsBlob(EncodingUtil.convertFromHex(bodyStartHex + fileHex + bodyEndHex));
+        req.setTimeout(120000);
+        
+        Http http = new Http();
+        HttpResponse response = http.send(req);
+        
+        if (response.getStatusCode() != 200) {
+            throw new QuickBooksException(parseAPIError(response));
+        }
+        
+        // Token maintenance
+        if (auth.Access_Token__c != accessToken) {
              update auth;
         }
     }
 
     // ==================== Helper Methods ====================
 
-    /**
-     * Internal helper to create a customer via API.
-     * Does NOT perform DML. Returns the QuickBooks Customer Id.
-     */
-    private static String createCustomerCallout(Account acc, String companyId, String accessToken) {
-        Map<String, Object> customerData = buildCustomerData(acc);
-        // Use the version of postToQuickBooks that accepts a token
+    public static String findCustomerByName(String displayName, String companyId, String accessToken) {
+        if (String.isBlank(displayName)) return null;
+
+        String escapedName = displayName.replace('\'', '\\\'');
+        String query = 'SELECT Id, DisplayName FROM Customer WHERE DisplayName = \'' + escapedName + '\'';
+        String endpoint = getBaseUrl(companyId) + API_VERSION + companyId + '/query?query=' +
+            EncodingUtil.urlEncode(query, 'UTF-8');
+
+        HttpResponse response = makeAPICall('GET', endpoint, null, accessToken);
+        if (response.getStatusCode() == 200) {
+            Map<String, Object> result = (Map<String, Object>) JSON.deserializeUntyped(response.getBody());
+            Map<String, Object> queryResponse = (Map<String, Object>) result.get('QueryResponse');
+            if (queryResponse != null && queryResponse.containsKey('Customer')) {
+                List<Object> customers = (List<Object>) queryResponse.get('Customer');
+                if (!customers.isEmpty()) {
+                    return String.valueOf(((Map<String, Object>) customers[0]).get('Id'));
+                }
+            }
+        }
+        return null;
+    }
+
+    public static String findOrCreateCustomer(Account acc, QuickBooksCustomerRequest request, String companyId, String accessToken) {
+        String displayName = String.isNotBlank(request?.displayName) ? request.displayName : acc.Name;
+        String existingCustomerId = findCustomerByName(displayName, companyId, accessToken);
+        if (existingCustomerId != null) {
+            return existingCustomerId;
+        }
+        return createCustomerCallout(acc, request, companyId, accessToken);
+    }
+
+    private static String createCustomerCallout(Account acc, QuickBooksCustomerRequest request, String companyId, String accessToken) {
+        Map<String, Object> customerData = buildCustomerData(acc, request);
         Map<String, Object> result = postToQuickBooks('customer', customerData, companyId, accessToken);
         Map<String, Object> customer = (Map<String, Object>) result.get('Customer');
-        return (String) customer.get('Id');
-    }
-    
-    // Overload for backwards compatibility/internal calls if needed, 
-    // but deprecated as it triggers DML in getValidAccessToken
-    private static String createCustomerCallout(Account acc, String companyId) {
-         // Retrieve token with deferred DML, but we can't defer DML here easily without passing auth object out.
-         // Used only by legacy logic? In this class, we updated callers.
-         // Safe fallback:
-         return createCustomerCallout(acc, companyId, QuickBooksAuthProvider.getValidAccessToken(companyId));
+        return String.valueOf(customer.get('Id'));
     }
 
-    /**
-     * Generic helper to POST to QuickBooks
-     * NEW SIGNATURE: Accepts Access Token
-     */
+    private static String createCustomerCallout(Account acc, String companyId, String accessToken) {
+        return createCustomerCallout(acc, null, companyId, accessToken);
+    }
+
     private static Map<String, Object> postToQuickBooks(String resource, Map<String, Object> data, String companyId, String accessToken) {
         String endpoint = getBaseUrl(companyId) + API_VERSION + companyId + '/' + resource;
-        
-        HttpResponse httpResponse = makeAPICallWithToken(
-            'POST',
-            endpoint,
-            JSON.serialize(data),
-            accessToken
-        );
-
+        HttpResponse httpResponse = makeAPICall('POST', endpoint, JSON.serialize(data), accessToken);
         if (httpResponse.getStatusCode() == 200) {
             return (Map<String, Object>) JSON.deserializeUntyped(httpResponse.getBody());
-        } else {
-            throw new QuickBooksException(parseAPIError(httpResponse));
         }
+        throw new QuickBooksException(parseAPIError(httpResponse));
     }
 
-    // OLD SIGNATURE for compatibility (uses auto-refresh which might cause DML error)
-    private static Map<String, Object> postToQuickBooks(String resource, Map<String, Object> data, String companyId) {
-        return postToQuickBooks(resource, data, companyId, QuickBooksAuthProvider.getValidAccessToken(companyId));
-    }
-
-    private static HttpResponse makeAPICallWithToken(String method, String endpoint, String body, String accessToken) {
+    private static HttpResponse makeAPICall(String method, String endpoint, String body, String accessToken) {
         Http http = new Http();
         HttpRequest request = new HttpRequest();
-
         request.setEndpoint(endpoint);
         request.setMethod(method);
         request.setHeader('Accept', 'application/json');
         request.setHeader('Content-Type', 'application/json');
-
         request.setHeader('Authorization', 'Bearer ' + accessToken);
-
         if (body != null) {
             request.setBody(body);
         }
-
         request.setTimeout(120000);
         return http.send(request);
     }
-    
-    // OLD SIGNATURE
-    private static HttpResponse makeAPICall(String method, String endpoint, String body, String companyId) {
-        return makeAPICallWithToken(method, endpoint, body, QuickBooksAuthProvider.getValidAccessToken(companyId));
-    }
 
-    private static Map<String, Object> buildCustomerData(Account acc) {
+    private static Map<String, Object> buildCustomerData(Account acc, QuickBooksCustomerRequest request) {
         Map<String, Object> customer = new Map<String, Object>();
-        customer.put('DisplayName', acc.Name);
-        customer.put('CompanyName', acc.Name);
 
-        Map<String, Object> billAddr = new Map<String, Object>();
-        billAddr.put('Line1', acc.BillingStreet);
-        billAddr.put('City', acc.BillingCity);
-        billAddr.put('CountrySubDivisionCode', acc.BillingState);
-        billAddr.put('PostalCode', acc.BillingPostalCode);
-        billAddr.put('Country', acc.BillingCountry);
-        customer.put('BillAddr', billAddr);
+        customer.put('DisplayName', String.isNotBlank(request?.displayName) ? request.displayName : acc.Name);
+        customer.put('CompanyName', String.isNotBlank(request?.companyName) ? request.companyName : acc.Name);
 
-        Map<String, Object> primaryPhone = new Map<String, Object>();
-        primaryPhone.put('FreeFormNumber', acc.Phone);
-        customer.put('PrimaryPhone', primaryPhone);
-
-        if (acc.Website != null) {
-            Map<String, Object> webAddr = new Map<String, Object>();
-            webAddr.put('URI', acc.Website);
-            customer.put('WebAddr', webAddr);
+        if (request != null && String.isNotBlank(request.firstName)) {
+            customer.put('GivenName', request.firstName);
+        }
+        if (request != null && String.isNotBlank(request.lastName)) {
+            customer.put('FamilyName', request.lastName);
+        }
+        if (request != null && String.isNotBlank(request.email)) {
+            customer.put('PrimaryEmailAddr', new Map<String, Object>{'Address' => request.email});
         }
 
+        String phone = (request != null && String.isNotBlank(request.phone)) ? request.phone : acc.Phone;
+        if (String.isNotBlank(phone)) {
+            customer.put('PrimaryPhone', new Map<String, Object>{'FreeFormNumber' => phone});
+        }
+
+        customer.put('BillAddr', new Map<String, Object>{
+            'Line1' => acc.BillingStreet,
+            'City' => acc.BillingCity,
+            'CountrySubDivisionCode' => acc.BillingState,
+            'PostalCode' => acc.BillingPostalCode,
+            'Country' => acc.BillingCountry
+        });
+
+        if (String.isNotBlank(acc.Website)) {
+            customer.put('WebAddr', new Map<String, Object>{'URI' => acc.Website});
+        }
         return customer;
     }
 
@@ -502,8 +571,15 @@ public with sharing class QuickBooksAPIService {
             customerMemo.put('value', request.customerMemo);
             estimateData.put('CustomerMemo', customerMemo);
         }
-        if (request.privateMemo != null) {
-            estimateData.put('PrivateNote', request.privateMemo);
+        
+        // ALWAYS include Salesforce Opportunity ID in PrivateNote for payment tracing
+        // This creates a reliable chain: Payment → Invoice → Estimate → Opportunity
+        String privateNote = request.privateMemo != null ? request.privateMemo + '\n' : '';
+        if (request.opportunityId != null) {
+            privateNote += 'SF-Opp:' + request.opportunityId;
+        }
+        if (String.isNotBlank(privateNote)) {
+            estimateData.put('PrivateNote', privateNote.trim());
         }
 
         // Tax settings

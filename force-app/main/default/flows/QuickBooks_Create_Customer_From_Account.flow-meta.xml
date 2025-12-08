@@ -25,11 +25,10 @@
     </processMetadataValues>
     <processType>AutoLaunchedFlow</processType>
     <actionCalls>
-        <description>Create a customer in QuickBooks</description>
         <name>Create_QuickBooks_Customer</name>
         <label>Create QuickBooks Customer</label>
         <locationX>176</locationX>
-        <locationY>575</locationY>
+        <locationY>335</locationY>
         <actionName>QuickBooksCustomerInvocable</actionName>
         <actionType>apex</actionType>
         <connector>
@@ -37,80 +36,44 @@
         </connector>
         <flowTransactionModel>CurrentTransaction</flowTransactionModel>
         <inputParameters>
-            <name>requests</name>
+            <name>accountId</name>
             <value>
-                <elementReference>customerRequest</elementReference>
+                <elementReference>$Record.Id</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>companyId</name>
+            <value>
+                <elementReference>$Setup.QuickBooks_Config__c.Company_Id__c</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>displayName</name>
+            <value>
+                <elementReference>$Record.Name</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>companyName</name>
+            <value>
+                <elementReference>$Record.Name</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>phone</name>
+            <value>
+                <elementReference>$Record.Phone</elementReference>
             </value>
         </inputParameters>
         <storeOutputAutomatically>true</storeOutputAutomatically>
     </actionCalls>
-    <actionCalls>
-        <description>Send email notification about QuickBooks sync error</description>
-        <name>Send_Error_Email</name>
-        <label>Send Error Email</label>
-        <locationX>308</locationX>
-        <locationY>815</locationY>
-        <actionName>emailSimple</actionName>
-        <actionType>emailSimple</actionType>
-        <connector>
-            <targetReference>Update_Account_Error</targetReference>
-        </connector>
-        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
-        <inputParameters>
-            <name>emailBody</name>
-            <value>
-                <stringValue>Failed to create QuickBooks customer for Account: {!$Record.Name}
-
-Error Message: {!Create_QuickBooks_Customer.message}
-
-Account ID: {!$Record.Id}</stringValue>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>emailAddresses</name>
-            <value>
-                <stringValue>{!$Setup.QuickBooks_Config__c.Admin_Email__c}</stringValue>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>emailSubject</name>
-            <value>
-                <stringValue>QuickBooks Integration Error - Account Sync Failed</stringValue>
-            </value>
-        </inputParameters>
-    </actionCalls>
-    <assignments>
-        <description>Assign values to the customer request object</description>
-        <name>Assign_Customer_Request</name>
-        <label>Assign Customer Request</label>
-        <locationX>176</locationX>
-        <locationY>455</locationY>
-        <assignmentItems>
-            <assignToReference>customerRequest.accountId</assignToReference>
-            <operator>Assign</operator>
-            <value>
-                <elementReference>$Record.Id</elementReference>
-            </value>
-        </assignmentItems>
-        <assignmentItems>
-            <assignToReference>customerRequest.companyId</assignToReference>
-            <operator>Assign</operator>
-            <value>
-                <elementReference>$Setup.QuickBooks_Config__c.Company_Id__c</elementReference>
-            </value>
-        </assignmentItems>
-        <connector>
-            <targetReference>Create_QuickBooks_Customer</targetReference>
-        </connector>
-    </assignments>
     <decisions>
-        <description>Check if the QuickBooks customer creation was successful</description>
         <name>Check_Creation_Success</name>
         <label>Check Creation Success</label>
         <locationX>176</locationX>
-        <locationY>695</locationY>
+        <locationY>455</locationY>
         <defaultConnector>
-            <targetReference>Send_Error_Email</targetReference>
+            <targetReference>Update_Account_Error</targetReference>
         </defaultConnector>
         <defaultConnectorLabel>Creation Failed</defaultConnectorLabel>
         <rules>
@@ -129,35 +92,11 @@ Account ID: {!$Record.Id}</stringValue>
             <label>Creation Successful</label>
         </rules>
     </decisions>
-    <decisions>
-        <description>Check if Account already has QuickBooks Customer ID</description>
-        <name>Check_QuickBooks_Customer_Id</name>
-        <label>Check QuickBooks Customer Id</label>
-        <locationX>176</locationX>
-        <locationY>335</locationY>
-        <defaultConnectorLabel>Has QuickBooks ID</defaultConnectorLabel>
-        <rules>
-            <name>No_QuickBooks_ID</name>
-            <conditionLogic>and</conditionLogic>
-            <conditions>
-                <leftValueReference>$Record.QuickBooks_Customer_Id__c</leftValueReference>
-                <operator>IsNull</operator>
-                <rightValue>
-                    <booleanValue>true</booleanValue>
-                </rightValue>
-            </conditions>
-            <connector>
-                <targetReference>Assign_Customer_Request</targetReference>
-            </connector>
-            <label>No QuickBooks ID</label>
-        </rules>
-    </decisions>
     <recordUpdates>
-        <description>Update Account with QuickBooks sync error status</description>
         <name>Update_Account_Error</name>
         <label>Update Account - Error</label>
         <locationX>308</locationX>
-        <locationY>935</locationY>
+        <locationY>575</locationY>
         <inputAssignments>
             <field>QuickBooks_Sync_Status__c</field>
             <value>
@@ -167,11 +106,10 @@ Account ID: {!$Record.Id}</stringValue>
         <inputReference>$Record</inputReference>
     </recordUpdates>
     <recordUpdates>
-        <description>Update Account with QuickBooks sync success status</description>
         <name>Update_Account_Success</name>
         <label>Update Account - Success</label>
         <locationX>50</locationX>
-        <locationY>815</locationY>
+        <locationY>575</locationY>
         <inputAssignments>
             <field>QuickBooks_Sync_Status__c</field>
             <value>
@@ -184,20 +122,11 @@ Account ID: {!$Record.Id}</stringValue>
         <locationX>50</locationX>
         <locationY>0</locationY>
         <connector>
-            <targetReference>Check_QuickBooks_Customer_Id</targetReference>
+            <targetReference>Create_QuickBooks_Customer</targetReference>
         </connector>
         <object>Account</object>
         <recordTriggerType>CreateAndUpdate</recordTriggerType>
         <triggerType>RecordAfterSave</triggerType>
     </start>
-    <status>Draft</status>
-    <variables>
-        <description>Request object for creating QuickBooks customer</description>
-        <name>customerRequest</name>
-        <apexClass>QuickBooksCustomerRequest</apexClass>
-        <dataType>Apex</dataType>
-        <isCollection>false</isCollection>
-        <isInput>false</isInput>
-        <isOutput>false</isOutput>
-    </variables>
+    <status>Active</status>
 </Flow>

@@ -13,17 +13,143 @@
     <processType>Flow</processType>
     <runInMode>SystemModeWithSharing</runInMode>
     <status>Active</status>
-
-    <!-- Start element -->
-    <start>
+    <actionCalls>
+        <name>Create_QuickBooks_Estimate</name>
+        <label>Create QuickBooks Estimate</label>
         <locationX>50</locationX>
-        <locationY>0</locationY>
+        <locationY>374</locationY>
+        <actionName>QuickBooksEstimateInvocable</actionName>
+        <actionType>apex</actionType>
         <connector>
-            <targetReference>Input_Screen</targetReference>
+            <targetReference>Decision_Success</targetReference>
         </connector>
-    </start>
-
-    <!-- Input Screen -->
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <inputParameters>
+            <name>opportunityId</name>
+            <value>
+                <elementReference>recordId</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>companyId</name>
+            <value>
+                <elementReference>Company_ID</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>customerRef</name>
+            <value>
+                <elementReference>QB_Customer_ID</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>customerName</name>
+            <value>
+                <elementReference>Customer_Name</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>lineItemsJson</name>
+            <value>
+                <elementReference>LineItemsJSON</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>discountPercent</name>
+            <value>
+                <elementReference>Discount_Percent</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>applyTaxAfterDiscount</name>
+            <value>
+                <elementReference>Apply_Tax_After_Discount</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>customerMemo</name>
+            <value>
+                <elementReference>Customer_Memo</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>customerEmail</name>
+            <value>
+                <elementReference>Customer_Email</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>billToAddress</name>
+            <value>
+                <elementReference>Bill_To_Address</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>shipToAddress</name>
+            <value>
+                <elementReference>Ship_To_Address</elementReference>
+            </value>
+        </inputParameters>
+        <outputParameters>
+            <assignToReference>EstimateResponse</assignToReference>
+            <name>output</name>
+        </outputParameters>
+    </actionCalls>
+    <assignments>
+        <name>Build_Line_Items_JSON</name>
+        <label>Build Line Items JSON</label>
+        <locationX>50</locationX>
+        <locationY>254</locationY>
+        <assignmentItems>
+            <assignToReference>LineItemsJSON</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>BuildLineItemsFormula</elementReference>
+            </value>
+        </assignmentItems>
+        <connector>
+            <targetReference>Create_QuickBooks_Estimate</targetReference>
+        </connector>
+    </assignments>
+    <decisions>
+        <name>Decision_Success</name>
+        <label>Estimate Created Successfully?</label>
+        <locationX>50</locationX>
+        <locationY>494</locationY>
+        <defaultConnector>
+            <targetReference>Error_Screen</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>Failed</defaultConnectorLabel>
+        <rules>
+            <name>Success</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>EstimateResponse.success</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <booleanValue>true</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Success_Screen</targetReference>
+            </connector>
+            <label>Success</label>
+        </rules>
+    </decisions>
+    <formulas>
+        <name>BuildLineItemsFormula</name>
+        <dataType>String</dataType>
+        <expression>'[{' +
+'"description":"' + {!Line_Item_1_Description} + '",' +
+'"quantity":' + TEXT({!Line_Item_1_Quantity}) + ',' +
+'"unitPrice":' + TEXT({!Line_Item_1_UnitPrice}) + ',' +
+'"amount":' + TEXT({!Line_Item_1_Quantity} * {!Line_Item_1_UnitPrice}) + ',' +
+'"itemRef":"' + {!Line_Item_1_ItemRef} + '",' +
+'"itemName":"' + {!Line_Item_1_ItemName} + '",' +
+'"taxCodeRef":"' + {!Line_Item_1_TaxCode} + '",' +
+'"detailType":"SalesItemLineDetail"' +
+'}]'</expression>
+    </formulas>
     <screens>
         <name>Input_Screen</name>
         <label>QuickBooks Estimate Details</label>
@@ -226,137 +352,6 @@
         <showFooter>true</showFooter>
         <showHeader>true</showHeader>
     </screens>
-
-    <!-- Build Line Items JSON -->
-    <assignments>
-        <name>Build_Line_Items_JSON</name>
-        <label>Build Line Items JSON</label>
-        <locationX>50</locationX>
-        <locationY>254</locationY>
-        <assignmentItems>
-            <assignToReference>LineItemsJSON</assignToReference>
-            <operator>Assign</operator>
-            <value>
-                <elementReference>BuildLineItemsFormula</elementReference>
-            </value>
-        </assignmentItems>
-        <connector>
-            <targetReference>Create_QuickBooks_Estimate</targetReference>
-        </connector>
-    </assignments>
-
-    <!-- Create QuickBooks Estimate -->
-    <actionCalls>
-        <name>Create_QuickBooks_Estimate</name>
-        <label>Create QuickBooks Estimate</label>
-        <locationX>50</locationX>
-        <locationY>374</locationY>
-        <actionName>QuickBooksEstimateInvocable</actionName>
-        <actionType>apex</actionType>
-        <connector>
-            <targetReference>Decision_Success</targetReference>
-        </connector>
-        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
-        <inputParameters>
-            <name>opportunityId</name>
-            <value>
-                <elementReference>recordId</elementReference>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>companyId</name>
-            <value>
-                <elementReference>Company_ID</elementReference>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>customerRef</name>
-            <value>
-                <elementReference>QB_Customer_ID</elementReference>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>customerName</name>
-            <value>
-                <elementReference>Customer_Name</elementReference>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>lineItemsJson</name>
-            <value>
-                <elementReference>LineItemsJSON</elementReference>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>discountPercent</name>
-            <value>
-                <elementReference>Discount_Percent</elementReference>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>applyTaxAfterDiscount</name>
-            <value>
-                <elementReference>Apply_Tax_After_Discount</elementReference>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>customerMemo</name>
-            <value>
-                <elementReference>Customer_Memo</elementReference>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>customerEmail</name>
-            <value>
-                <elementReference>Customer_Email</elementReference>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>billToAddress</name>
-            <value>
-                <elementReference>Bill_To_Address</elementReference>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>shipToAddress</name>
-            <value>
-                <elementReference>Ship_To_Address</elementReference>
-            </value>
-        </inputParameters>
-        <outputParameters>
-            <assignToReference>EstimateResponse</assignToReference>
-            <name>output</name>
-        </outputParameters>
-    </actionCalls>
-
-    <!-- Decision: Success? -->
-    <decisions>
-        <name>Decision_Success</name>
-        <label>Estimate Created Successfully?</label>
-        <locationX>50</locationX>
-        <locationY>494</locationY>
-        <defaultConnector>
-            <targetReference>Error_Screen</targetReference>
-        </defaultConnector>
-        <defaultConnectorLabel>Failed</defaultConnectorLabel>
-        <rules>
-            <name>Success</name>
-            <conditionLogic>and</conditionLogic>
-            <conditions>
-                <leftValueReference>EstimateResponse.success</leftValueReference>
-                <operator>EqualTo</operator>
-                <rightValue>
-                    <booleanValue>true</booleanValue>
-                </rightValue>
-            </conditions>
-            <connector>
-                <targetReference>Success_Screen</targetReference>
-            </connector>
-            <label>Success</label>
-        </rules>
-    </decisions>
-
-    <!-- Success Screen -->
     <screens>
         <name>Success_Screen</name>
         <label>Success</label>
@@ -373,8 +368,6 @@
         <showFooter>true</showFooter>
         <showHeader>true</showHeader>
     </screens>
-
-    <!-- Error Screen -->
     <screens>
         <name>Error_Screen</name>
         <label>Error</label>
@@ -391,8 +384,13 @@
         <showFooter>true</showFooter>
         <showHeader>true</showHeader>
     </screens>
-
-    <!-- Variables -->
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Input_Screen</targetReference>
+        </connector>
+    </start>
     <variables>
         <name>recordId</name>
         <dataType>String</dataType>
@@ -402,11 +400,11 @@
     </variables>
     <variables>
         <name>EstimateResponse</name>
+        <apexClass>QuickBooksEstimateResponse</apexClass>
         <dataType>Apex</dataType>
         <isCollection>false</isCollection>
         <isInput>false</isInput>
         <isOutput>false</isOutput>
-        <objectClassName>QuickBooksEstimateResponse</objectClassName>
     </variables>
     <variables>
         <name>LineItemsJSON</name>
@@ -415,20 +413,4 @@
         <isInput>false</isInput>
         <isOutput>false</isOutput>
     </variables>
-
-    <!-- Formulas -->
-    <formulas>
-        <name>BuildLineItemsFormula</name>
-        <dataType>String</dataType>
-        <expression>'[{' +
-'"description":"' + {!Line_Item_1_Description} + '",' +
-'"quantity":' + TEXT({!Line_Item_1_Quantity}) + ',' +
-'"unitPrice":' + TEXT({!Line_Item_1_UnitPrice}) + ',' +
-'"amount":' + TEXT({!Line_Item_1_Quantity} * {!Line_Item_1_UnitPrice}) + ',' +
-'"itemRef":"' + {!Line_Item_1_ItemRef} + '",' +
-'"itemName":"' + {!Line_Item_1_ItemName} + '",' +
-'"taxCodeRef":"' + {!Line_Item_1_TaxCode} + '",' +
-'"detailType":"SalesItemLineDetail"' +
-'}]'</expression>
-    </formulas>
 </Flow>

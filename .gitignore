@@ -66,3 +66,24 @@ coverage/
 
 # Documentation build
 docs/_build/
+
+# Client-specific files (not for public repo)
+estimate-line-items*.json
+force-app/main/default/flows/Create_and_Send_Oxy*.flow-meta.xml
+force-app/main/default/flows/Create_and_Send_Oxycell*.flow-meta.xml
+force-app/main/default/flows/Lead_Quote.flow-meta.xml
+force-app/main/default/flows/Payment_Update_Opportunity_Closed_Won.flow-meta.xml
+
+# Debug/test scripts (one-off utilities)
+scripts/apex/backfill*.apex
+scripts/apex/check*.apex
+scripts/apex/debug*.apex
+scripts/apex/find*.apex
+scripts/apex/relink*.apex
+scripts/apex/test*.apex
+scripts/apex/verify*.apex
+scripts/apex/createCustomEstimate.apex
+scripts/apex/queryMissingItems.apex
+
+# Packages (separate repos or not ready for public)
+packages/

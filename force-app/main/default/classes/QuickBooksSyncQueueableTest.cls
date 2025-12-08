@@ -124,6 +124,15 @@ private class QuickBooksSyncQueueableTest {
         System.enqueueJob(job);
         Test.stopTest();
 
+        // Verify Invoice record was created
+        Invoice__c invoice = [
+            SELECT QuickBooks_Invoice_Number__c, Total_Amount__c, Account__c
+            FROM Invoice__c
+            WHERE QuickBooks_Invoice_Id__c = 'QB_INV_001'
+        ];
+        System.assertEquals(1500.00, invoice.Total_Amount__c);
+        System.assertEquals('INV-1001', invoice.QuickBooks_Invoice_Number__c);
+        
         // Verify Opportunity was updated
         Opportunity updatedOpp = [
             SELECT QuickBooks_Invoice_Number__c, Amount, QuickBooks_Sync_Status__c
@@ -155,13 +164,18 @@ private class QuickBooksSyncQueueableTest {
 
         // Verify Payment record was created
         Payment__c payment = [
-            SELECT Payment_Amount__c, Payment_Reference_Number__c, Notes__c, Related_Account__c
+            SELECT Payment_Amount__c, Payment_Reference_Number__c, Notes__c,
+                   Related_Account__c, Related_Opportunity__c, QuickBooks_Invoice_Id__c
             FROM Payment__c
             WHERE QuickBooks_Payment_Id__c = 'QB_PAY_001'
         ];
         System.assertEquals(500.00, payment.Payment_Amount__c);
         System.assertEquals('REF-123', payment.Payment_Reference_Number__c);
         System.assertNotEquals(null, payment.Related_Account__c);
+        // Verify Invoice linkage
+        System.assertEquals('QB_INV_001', payment.QuickBooks_Invoice_Id__c);
+        // Verify Opportunity linkage (via Invoice ID)
+        System.assertNotEquals(null, payment.Related_Opportunity__c);
     }
 
     /**
@@ -463,6 +477,17 @@ private class QuickBooksSyncQueueableTest {
                 'CustomerRef' => new Map<String, Object>{
                     'value' => 'QB_CUST_001',
                     'name' => 'Test Customer'
+                },
+                'Line' => new List<Object>{
+                    new Map<String, Object>{
+                        'Amount' => 500.00,
+                        'LinkedTxn' => new List<Object>{
+                            new Map<String, Object>{
+                                'TxnId' => 'QB_INV_001',
+                                'TxnType' => 'Invoice'
+                            }
+                        }
+                    }
                 }
             };
             return JSON.serialize(new Map<String, Object>{'Payment' => payment});

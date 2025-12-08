@@ -225,11 +225,14 @@ public with sharing class QuickBooksEstimateInvocable {
             estimate.put('CustomerMemo', memo);
         }
 
-        // Private memo (optional)
-        if (String.isNotBlank(request.privateMemo)) {
-            Map<String, Object> memo = new Map<String, Object>();
-            memo.put('value', request.privateMemo);
-            estimate.put('PrivateMemo', memo);
+        // Private memo - ALWAYS include Salesforce Opportunity ID for payment tracing
+        // This creates a reliable chain: Payment → Invoice → Estimate → Opportunity
+        String privateNoteValue = String.isNotBlank(request.privateMemo) ? request.privateMemo + '\n' : '';
+        if (opp != null && opp.Id != null) {
+            privateNoteValue += 'SF-Opp:' + opp.Id;
+        }
+        if (String.isNotBlank(privateNoteValue)) {
+            estimate.put('PrivateNote', privateNoteValue.trim());
         }
 
         // Bill Email (optional)

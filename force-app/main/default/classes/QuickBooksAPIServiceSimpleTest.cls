@@ -130,6 +130,10 @@ private class QuickBooksAPIServiceSimpleTest {
 
     @isTest
     static void testCustomerInvocable() {
+        // Create test auth
+        String companyId = '123456789';
+        QuickBooksTestDataFactory.createTestAuth(companyId, 'test_token', 'test_refresh', true);
+
         // Create test account
         Account testAccount = new Account(
             Name = 'Test Account'
@@ -139,6 +143,7 @@ private class QuickBooksAPIServiceSimpleTest {
         // Create request with all fields
         QuickBooksCustomerRequest request = new QuickBooksCustomerRequest();
         request.accountId = testAccount.Id;
+        request.companyId = companyId;
         request.fullName = 'Jane Smith';
         request.displayName = 'Test Account';
         request.firstName = 'Jane';
@@ -146,6 +151,10 @@ private class QuickBooksAPIServiceSimpleTest {
         request.companyName = 'Test Company';
         request.email = 'jane@example.com';
         request.phone = '555-5678';
+
+        // Mock HTTP callout
+        Test.setMock(HttpCalloutMock.class, new QuickBooksMockCallout(200,
+            '{"Customer": {"Id": "QB-123"}}'));
 
         // Call invocable method
         Test.startTest();
@@ -156,5 +165,6 @@ private class QuickBooksAPIServiceSimpleTest {
         // Verify response
         System.assertEquals(1, responses.size());
         System.assertEquals(true, responses[0].success);
+        System.assertEquals('QB-123', responses[0].quickBooksCustomerId);
     }
 }
